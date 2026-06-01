@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExamTopics Practice</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Home: Exam Library -->
+        <section id="homeScreen" class="screen active">
+            <div class="home-header">
+                <h1>🎓 ExamTopics Practice</h1>
+                <p class="subtitle">Sélectionnez une certification ou importez-en une nouvelle</p>
+            </div>
+
+            <div class="library-actions">
+                <button class="btn btn-primary" id="btnImport">📥 Importer un fichier .md</button>
+                <button class="btn btn-secondary" id="btnDownload">⬇️ Télécharger depuis ExamTopics</button>
+                <input type="file" id="fileInput" accept=".md,.txt" hidden>
+            </div>
+
+            <div class="library-section">
+                <h2>📚 Certifications disponibles</h2>
+                <div id="examLibrary" class="exam-library">
+                    <div class="loading">Chargement...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Download Modal -->
+        <div id="downloadModal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>⬇️ Télécharger un examen</h2>
+                    <button class="modal-close" id="closeDownloadModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-info">Utilise <a href="https://github.com/thatonecodes/examtopics-downloader" target="_blank">examtopics-downloader</a> via Docker pour télécharger les questions.</p>
+                    
+                    <div class="dl-steps">
+                        <div class="dl-step">
+                            <span class="dl-step-num">1</span>
+                            <label>Choisissez le provider :
+                                <select id="dlProvider"></select>
+                            </label>
+                        </div>
+                        <div class="dl-step">
+                            <span class="dl-step-num">2</span>
+                            <label>Choisissez l'examen :
+                                <select id="dlExamSelect"><option value="">— Sélectionnez un provider d'abord —</option></select>
+                                <span class="dl-hint" id="dlExamHint">💡 Sélectionnez un provider pour charger la liste des exams disponibles</span>
+                            </label>
+                        </div>
+                        <div id="dlExamInfo" class="dl-exam-info hidden">
+                            <div class="dl-exam-info-content">
+                                <span id="dlExamInfoText">Chargement...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="dlStatus" class="dl-status hidden"></div>
+                    <div id="dlProgress" class="dl-progress hidden">
+                        <div class="dl-progress-header">
+                            <span id="dlProgressText">Téléchargement...</span>
+                            <span id="dlProgressPercent">0%</span>
+                        </div>
+                        <div class="dl-progress-bar">
+                            <div id="dlProgressFill" class="dl-progress-fill"></div>
+                        </div>
+                        <span id="dlProgressDetail" class="dl-progress-detail"></span>
+                    </div>
+                    <button class="btn btn-primary btn-full" id="btnStartDownload">🚀 Lancer le téléchargement</button>
+                    
+                    <div class="modal-alt">
+                        <p>Ou copiez cette commande dans votre terminal :</p>
+                        <div class="cmd-copy">
+                            <code id="dlCommand">docker run -it --name examtopics-dl ghcr.io/thatonecodes/examtopics-downloader:latest -p cisco -s 200-301 -save-links -o output.md</code>
+                            <button class="btn btn-sm btn-secondary" id="btnCopyCmd" title="Copier">📋</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mode Selection -->
+        <section id="modeSelect" class="screen">
+            <button class="btn btn-link back-btn" id="backToHome">← Retour aux certifications</button>
+            <h1 id="selectedExamTitle">Certification</h1>
+            <div id="examInfo" class="exam-info"></div>
+
+            <!-- Range selector shared between modes -->
+            <div class="range-selector">
+                <h3>📋 Sélection des questions</h3>
+                <div class="range-options">
+                    <label class="range-radio">
+                        <input type="radio" name="questionRange" value="all" checked>
+                        <span>Toutes les questions</span>
+                    </label>
+                    <label class="range-radio">
+                        <input type="radio" name="questionRange" value="range">
+                        <span>Plage personnalisée</span>
+                    </label>
+                    <label class="range-radio">
+                        <input type="radio" name="questionRange" value="last">
+                        <span>Les X dernières</span>
+                    </label>
+                    <label class="range-radio">
+                        <input type="radio" name="questionRange" value="first">
+                        <span>Les X premières</span>
+                    </label>
+                </div>
+                <div id="rangeInputs" class="range-inputs hidden">
+                    <div id="rangeCustom" class="range-custom hidden">
+                        <label>De la question :
+                            <input type="number" id="rangeFrom" min="1" value="1">
+                        </label>
+                        <label>À la question :
+                            <input type="number" id="rangeTo" min="1" value="50">
+                        </label>
+                    </div>
+                    <div id="rangeCount" class="range-count hidden">
+                        <label>Combien :
+                            <input type="number" id="rangeN" min="1" value="50">
+                        </label>
+                    </div>
+                </div>
+                <div id="rangePreview" class="range-preview"></div>
+            </div>
+            
+            <div class="mode-cards">
+                <div class="mode-card">
+                    <span class="mode-icon">📝</span>
+                    <h2>Mode Examen</h2>
+                    <p>Conditions réelles : timer, batch de questions, résultats à la fin</p>
+                    <div class="mode-options">
+                        <label>Piocher X questions dans la sélection :
+                            <input type="number" id="examCount" min="1" value="20">
+                        </label>
+                        <label>Durée (minutes) :
+                            <input type="number" id="examTime" min="1" value="30">
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="examShuffle" checked>
+                            Mélanger les questions
+                        </label>
+                    </div>
+                    <button class="btn btn-primary" id="startExam">Commencer l'examen</button>
+                </div>
+
+                <div class="mode-card">
+                    <span class="mode-icon">📚</span>
+                    <h2>Mode Entraînement</h2>
+                    <p>Review chaque réponse immédiatement avec explications</p>
+                    <div class="mode-options">
+                        <label>Piocher X questions dans la sélection :
+                            <input type="number" id="trainCount" min="1" value="10">
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="trainShuffle" checked>
+                            Mélanger les questions
+                        </label>
+                    </div>
+                    <button class="btn btn-primary" id="startTraining">Commencer l'entraînement</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Exam Mode -->
+        <section id="examScreen" class="screen">
+            <div class="exam-header">
+                <div class="exam-progress">
+                    <span id="examProgress">1/20</span>
+                    <div class="progress-bar"><div id="examProgressBar" class="progress-fill"></div></div>
+                </div>
+                <div class="exam-timer" id="examTimer">30:00</div>
+            </div>
+
+            <div class="question-container" id="examQuestion"></div>
+
+            <div class="exam-nav">
+                <button class="btn btn-secondary" id="examPrev">← Précédent</button>
+                <span id="examQuestionDots" class="question-dots"></span>
+                <button class="btn btn-secondary" id="examNext">Suivant →</button>
+                <button class="btn btn-danger" id="examSubmit">Terminer l'examen</button>
+            </div>
+        </section>
+
+        <!-- Training Mode -->
+        <section id="trainingScreen" class="screen">
+            <div class="exam-header">
+                <div class="exam-progress">
+                    <span id="trainProgress">1/10</span>
+                    <div class="progress-bar"><div id="trainProgressBar" class="progress-fill"></div></div>
+                </div>
+                <div class="train-score" id="trainScore">Score: 0/0</div>
+            </div>
+
+            <div class="question-container" id="trainQuestion"></div>
+
+            <div id="trainFeedback" class="feedback hidden"></div>
+
+            <div class="exam-nav">
+                <button class="btn btn-primary" id="trainCheck">Vérifier</button>
+                <button class="btn btn-secondary" id="trainNext" disabled>Suivant →</button>
+                <button class="btn btn-link" id="trainQuit">Quitter l'entraînement</button>
+            </div>
+        </section>
+
+        <!-- Results -->
+        <section id="resultsScreen" class="screen">
+            <h1 id="resultsTitle">Résultats</h1>
+            <div class="results-summary" id="resultsSummary"></div>
+            <div class="results-details" id="resultsDetails"></div>
+            <div class="results-actions">
+                <button class="btn btn-primary" id="backToMenu">Retour au menu</button>
+                <button class="btn btn-secondary" id="retryExam">Recommencer</button>
+            </div>
+        </section>
+    </div>
+
+    <script src="parser.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

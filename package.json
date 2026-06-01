@@ -1,0 +1,13 @@
+{
+  "name": "examtopics-practice",
+  "version": "1.0.0",
+  "description": "Local exam practice site powered by examtopics-downloader",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "download": "node downloader.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}
