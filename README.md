@@ -1,81 +1,76 @@
 # 🎓 ExamTopics Practice
 
-Site local pour s'entraîner aux examens à partir des questions téléchargées via [examtopics-downloader](https://github.com/thatonecodes/examtopics-downloader).
+Site local pour s'entraîner aux certifications IT à partir des questions téléchargées via [examtopics-downloader](https://github.com/thatonecodes/examtopics-downloader).
 
-## Lancement en 1 clic
+## Lancement
 
-```bash
-./start.sh
-```
+Double-cliquez sur le fichier correspondant à votre OS dans le dossier `installer/` :
 
-Ça installe les dépendances si nécessaire, lance le serveur, et ouvre le navigateur sur http://localhost:3000.
+| OS | Fichier | Action |
+|----|---------|--------|
+| macOS | `installer/start-mac.command` | Double-clic dans le Finder |
+| Windows | `installer/start-windows.bat` | Double-clic |
+| Linux | `installer/start-linux.sh` | `./installer/start-linux.sh` |
 
-Alternativement :
-```bash
-npm start
-```
+Le script installe tout automatiquement au premier lancement (Node.js, dépendances), puis lance directement les fois suivantes.
+
+Le site s'ouvre sur **http://localhost:3000**.
 
 ## Fonctionnalités
 
-- **Bibliothèque de certifications** : vos exams téléchargés sont listés au lancement, cliquez pour commencer
-- **Mode Examen** : conditions réelles avec timer, batch de X questions, résultats détaillés
-- **Mode Entraînement** : review immédiate de chaque réponse avec explications
-- **Lien ExamTopics** : chaque question contient un lien direct vers la page officielle
-- **Import facile** : importez un fichier .md directement depuis l'interface
-- **Téléchargement intégré** : téléchargez depuis ExamTopics via Docker (optionnel)
+- **Bibliothèque de certifications** classée par provider (AWS, Cisco, Google, etc.)
+- **Mode Examen** : timer, batch de X questions, résultats détaillés à la fin
+- **Mode Entraînement** : feedback immédiat avec discussions de la communauté
+- **Sélection par plage** : toutes, les X dernières, les X premières, ou plage personnalisée
+- **Multi-réponses** : support des questions à choix multiples (2-3 réponses attendues)
+- **Discussions ExamTopics** : réponses et explications de la communauté intégrées
+- **Lien direct** vers chaque question sur ExamTopics
+- **Téléchargement intégré** via Docker depuis l'interface
 - **Raccourcis clavier** : A-F pour sélectionner, ←→ pour naviguer, Enter pour valider
 
 ## Ajouter des questions
 
-### Option 1 : Import depuis l'interface
-Cliquez "Importer un fichier .md" et sélectionnez votre fichier.
+### Depuis l'interface
+- Cliquez "Importer un fichier .md" pour charger un fichier existant
+- Cliquez "Télécharger depuis ExamTopics" pour scraper via Docker (nécessite Docker)
 
-### Option 2 : Copier dans le dossier exams/
-Placez vos fichiers `.md` directement dans le dossier `exams/`.
+### Manuellement
+Placez vos fichiers `.md` dans le dossier `exams/`. Ils apparaîtront au prochain lancement.
 
-### Option 3 : Télécharger via Docker
+### Via Docker en ligne de commande
 ```bash
-docker pull ghcr.io/thatonecodes/examtopics-downloader:latest
-docker run -it --name examtopics-dl \
+docker run --name examtopics-dl \
   ghcr.io/thatonecodes/examtopics-downloader:latest \
-  -p cisco -s 200-301 -save-links -o output.md
-docker cp examtopics-dl:/app/output.md ./exams/cisco_200-301.md
+  -p amazon -s "aws-certified-solutions-architect-professional-sap-c02" \
+  -c -save-links -o output.md
+docker cp examtopics-dl:/app/output.md ./exams/aws-sap-c02.md
 docker rm examtopics-dl
 ```
 
-### Option 4 : Avec Go
-```bash
-git clone https://github.com/thatonecodes/examtopics-downloader
-cd examtopics-downloader
-go run ./cmd/main.go -p cisco -s 200-301 -save-links -o output.md
-cp output.md /chemin/vers/Examtopics/exams/cisco_200-301.md
-```
+> Le flag `-c` est important : il inclut les discussions de la communauté (réponses, explications, votes).
 
 ## Providers disponibles
 
-| Provider | Description |
-|----------|-------------|
-| amazon | AWS Certifications |
-| cisco | Cisco (CCNA, CCNP...) |
-| comptia | CompTIA (A+, Security+...) |
-| google | Google Cloud |
-| microsoft | Microsoft (Azure, M365...) |
-| isc2 | ISC2 (CISSP...) |
-| fortinet | Fortinet (NSE...) |
-| ec-council | EC-Council (CEH...) |
-| ... | [Liste complète](https://github.com/thatonecodes/examtopics-downloader#exam-providers--p) |
+amazon, cisco, comptia, google, microsoft, isc2, fortinet, juniper, isaca, vmware, servicenow, ec-council, oracle, paloaltonetworks
+
+[Liste complète des exams](https://github.com/thatonecodes/examtopics-downloader#exam-providers--p)
 
 ## Structure
 
 ```
-├── start.sh            # Lancement en 1 clic
-├── server.js           # Serveur Express (API + static)
-├── package.json        # Dépendances
-├── public/             # Frontend
+├── installer/              # Scripts de lancement (double-clic)
+│   ├── start-mac.command
+│   ├── start-windows.bat
+│   ├── start-linux.sh
+│   └── README.md
+├── public/                 # Frontend
 │   ├── index.html
 │   ├── style.css
 │   ├── parser.js
 │   └── app.js
-└── exams/              # Vos fichiers de questions (.md)
-    └── cisco_200-301_sample.md
+├── exams/                  # Vos fichiers de questions (.md, gitignored)
+├── server.js               # Serveur Express (API + static)
+├── package.json
+├── start.sh                # Lanceur alternatif (terminal)
+└── README.md
 ```
