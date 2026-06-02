@@ -573,7 +573,6 @@
 
         bindChoiceClicks(container, (letter) => {
             if (q.multiAnswer) {
-                // Toggle selection for multi-answer
                 let current = userAnswers[currentIndex] || [];
                 if (!Array.isArray(current)) current = [current];
                 if (current.includes(letter)) {
@@ -586,6 +585,7 @@
             } else {
                 userAnswers[currentIndex] = letter;
             }
+            saveSession();
             renderExamQuestion();
         });
 
@@ -593,11 +593,11 @@
     }
 
     document.getElementById('examPrev').addEventListener('click', () => {
-        if (currentIndex > 0) { currentIndex--; renderExamQuestion(); }
+        if (currentIndex > 0) { currentIndex--; saveSession(); renderExamQuestion(); }
     });
 
     document.getElementById('examNext').addEventListener('click', () => {
-        if (currentIndex < currentQuestions.length - 1) { currentIndex++; renderExamQuestion(); }
+        if (currentIndex < currentQuestions.length - 1) { currentIndex++; saveSession(); renderExamQuestion(); }
     });
 
     document.getElementById('examSubmit').addEventListener('click', () => {
@@ -610,6 +610,7 @@
 
     function finishExam() {
         clearInterval(timerInterval);
+        clearSession();
         showResults();
     }
 
@@ -650,6 +651,7 @@
             } else {
                 userAnswers[currentIndex] = letter;
             }
+            saveSession();
             // Re-render choices state
             const selectedLetters = Array.isArray(userAnswers[currentIndex]) ? userAnswers[currentIndex] : (userAnswers[currentIndex] ? [userAnswers[currentIndex]] : []);
             container.querySelectorAll('.choice').forEach(el => {
@@ -738,6 +740,7 @@
     document.getElementById('trainNext').addEventListener('click', () => {
         if (currentIndex < currentQuestions.length - 1) {
             currentIndex++;
+            saveSession();
             renderTrainingQuestion();
         } else {
             showResults();
@@ -796,6 +799,7 @@
     // ─── Results ─────────────────────────────────────────────────────────
     function showResults() {
         clearInterval(timerInterval);
+        clearSession();
         
         let correct = 0, incorrect = 0, unanswered = 0;
         currentQuestions.forEach((q, i) => {
@@ -925,7 +929,62 @@
         }
     });
 
+    // ─── Session Persistence ─────────────────────────────────────────────
+    function saveSession() {
+        const state = {
+            mode,
+            currentQuestions,
+            currentIndex,
+            userAnswers,
+            timeRemaining,
+            trainCorrect,
+            trainTotal,
+            currentExamName,
+            allQuestions
+        };
+        sessionStorage.setItem('examSession', JSON.stringify(state));
+    }
+
+    function clearSession() {
+        sessionStorage.removeItem('examSession');
+    }
+
+    function restoreSession() {
+        const saved = sessionStorage.getItem('examSession');
+        if (!saved) return false;
+
+        try {
+            const state = JSON.parse(saved);
+            if (!state.mode || !state.currentQuestions || state.currentQuestions.length === 0) return false;
+
+            mode = state.mode;
+            currentQuestions = state.currentQuestions;
+            currentIndex = state.currentIndex;
+            userAnswers = state.userAnswers;
+            timeRemaining = state.timeRemaining;
+            trainCorrect = state.trainCorrect;
+            trainTotal = state.trainTotal;
+            currentExamName = state.currentExamName;
+            allQuestions = state.allQuestions;
+
+            if (mode === 'exam') {
+                showScreen('exam');
+                renderExamQuestion();
+                startTimer();
+            } else if (mode === 'training') {
+                showScreen('training');
+                renderTrainingQuestion();
+            }
+            return true;
+        } catch {
+            clearSession();
+            return false;
+        }
+    }
+
     // ─── Init ────────────────────────────────────────────────────────────
-    loadLibrary();
+    if (!restoreSession()) {
+        loadLibrary();
+    }
 
 })();
