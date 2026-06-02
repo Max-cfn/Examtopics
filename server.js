@@ -245,33 +245,24 @@ app.post('/api/download', (req, res) => {
     res.json({ status: 'started', containerName, message: `Téléchargement en cours: ${provider} / ${search}...` });
     
     // Run the download with -c flag to include comments/discussions, then copy, then cleanup
-    const script = `
-        docker run --name ${containerName} ghcr.io/thatonecodes/examtopics-downloader:latest -p ${provider} -s "${search}" -c -save-links -o output.md
-        docker cp ${containerName}:/app/output.md "${outputPath}"
-        docker rm ${containerName}
-    `;
+    const runCmd = `docker run --name ${containerName} ghcr.io/thatonecodes/examtopics-downloader:latest -p ${provider} -s "${search}" -c -save-links -o output.md`;
     
-    exec(`/bin/sh -c '${script.replace(/'/g, "'\\''")}'`, { timeout: 600000 }, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`Download error for ${outputFile}: ${error.message}`);
-            // Try to copy anyway in case the run succeeded but something else failed
-            try {
-                execSync(`docker cp ${containerName}:/app/output.md "${outputPath}"`, { stdio: 'pipe' });
-                execSync(`docker rm ${containerName}`, { stdio: 'pipe' });
-                console.log(`Recovered file: ${outputFile}`);
-            } catch {
-                // Cleanup
-                try { execSync(`docker rm ${containerName} 2>/dev/null`, { stdio: 'pipe' }); } catch {}
-            }
-        } else {
-            console.log(`✓ Downloaded: ${outputFile}`);
-        }
-        
-        // Verify the file is valid (more than just a header)
+    exec(runCmd, { timeout: 600000 }, (error) => {
+        // Whether it errored or not, try to copy the output
         try {
-            const content = fs.readFileSync(outputPath, 'utf8');
-            if (content.length < 500) {
-                console.warn(`⚠ File ${outputFile} seems too small (${content.length} bytes). Search term may not match any exam.`);
+            execSync(`docker cp ${containerName}:/app/output.md "${outputPath}"`, { stdio: 'pipe' });
+            console.log(`✓ Downloaded: ${outputFile}`);
+        } catch (cpErr) {
+            console.error(`✗ Failed to copy output for ${outputFile}: ${cpErr.message}`);
+        }
+        // Cleanup container
+        try { execSync(`docker rm ${containerName}`, { stdio: 'pipe' }); } catch {}
+        
+        // Verify the file
+        try {
+            const stat = fs.statSync(outputPath);
+            if (stat.size < 500) {
+                console.warn(`⚠ File ${outputFile} seems too small (${stat.size} bytes). Search term may not match any exam.`);
             }
         } catch {}
     });
