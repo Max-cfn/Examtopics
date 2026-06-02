@@ -896,7 +896,14 @@ a:hover {
     display: flex;
     gap: 1rem;
     align-items: center;
+    justify-content: space-between;
     flex-wrap: wrap;
+}
+
+.nav-right {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
 }
 
 .exam-nav .btn-danger {
@@ -904,7 +911,7 @@ a:hover {
 }
 
 .exam-nav .btn-link {
-    margin-left: auto;
+    margin-left: 0;
 }
 
 /* Results */
