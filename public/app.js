@@ -462,6 +462,7 @@
     document.getElementById('backToHome').addEventListener('click', () => {
         showScreen('home');
         loadLibrary();
+        renderHistory();
     });
 
     // ─── Start Exam ──────────────────────────────────────────────────────
@@ -796,6 +797,77 @@
         return div.innerHTML;
     }
 
+    // ─── History ───────────────────────────────────────────────────────────
+    function saveToHistory(correct, incorrect, unanswered, total, score) {
+        const history = JSON.parse(localStorage.getItem('quizHistory') || '[]');
+        const rangeType = document.querySelector('input[name="questionRange"]:checked')?.value || 'all';
+        
+        let rangeDesc = 'Toutes';
+        if (rangeType === 'last') rangeDesc = `${document.getElementById('rangeN')?.value || '?'} dernières`;
+        else if (rangeType === 'first') rangeDesc = `${document.getElementById('rangeN')?.value || '?'} premières`;
+        else if (rangeType === 'range') rangeDesc = `Q${document.getElementById('rangeFrom')?.value || '?'}–${document.getElementById('rangeTo')?.value || '?'}`;
+
+        history.unshift({
+            date: new Date().toISOString(),
+            exam: currentExamName,
+            mode: mode === 'exam' ? 'Examen' : 'Entraînement',
+            total,
+            correct,
+            incorrect,
+            unanswered,
+            score,
+            range: rangeDesc,
+            shuffled: mode === 'exam' ? document.getElementById('examShuffle')?.checked : document.getElementById('trainShuffle')?.checked
+        });
+
+        // Keep last 50 entries
+        if (history.length > 50) history.length = 50;
+        localStorage.setItem('quizHistory', JSON.stringify(history));
+    }
+
+    function renderHistory() {
+        const container = document.getElementById('historyList');
+        const history = JSON.parse(localStorage.getItem('quizHistory') || '[]');
+
+        if (history.length === 0) {
+            container.innerHTML = '<p class="history-empty">Aucune session enregistrée. Lancez un quiz pour commencer !</p>';
+            return;
+        }
+
+        let html = `<div class="history-header-row">
+            <span>Date</span><span>Exam</span><span>Mode</span><span>Questions</span><span>Score</span><span>Plage</span>
+        </div>`;
+
+        for (const entry of history.slice(0, 20)) {
+            const date = new Date(entry.date);
+            const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+            const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            const scoreClass = entry.score >= 80 ? 'good' : entry.score >= 60 ? 'medium' : 'bad';
+            
+            html += `<div class="history-row">
+                <span class="history-date">${dateStr} ${timeStr}</span>
+                <span class="history-exam">${escapeHTML(entry.exam)}</span>
+                <span class="history-mode">${entry.mode}</span>
+                <span class="history-questions">${entry.correct}/${entry.total} ${entry.shuffled ? '🔀' : ''}</span>
+                <span class="history-score ${scoreClass}">${entry.score}%</span>
+                <span class="history-range">${entry.range}</span>
+            </div>`;
+        }
+
+        if (history.length > 0) {
+            html += `<button class="btn btn-sm btn-link" id="clearHistory">🗑️ Effacer l'historique</button>`;
+        }
+
+        container.innerHTML = html;
+
+        document.getElementById('clearHistory')?.addEventListener('click', () => {
+            if (confirm('Effacer tout l\'historique ?')) {
+                localStorage.removeItem('quizHistory');
+                renderHistory();
+            }
+        });
+    }
+
     // ─── Results ─────────────────────────────────────────────────────────
     function showResults() {
         clearInterval(timerInterval);
@@ -813,6 +885,9 @@
 
         const total = currentQuestions.length;
         const score = Math.round((correct / total) * 100);
+
+        // Save to history
+        saveToHistory(correct, incorrect, unanswered, total, score);
 
         document.getElementById('resultsTitle').textContent = mode === 'exam' ? '📊 Résultats de l\'examen' : '📊 Résultats de l\'entraînement';
         
@@ -898,6 +973,7 @@
 
     // ─── Results Actions ─────────────────────────────────────────────────
     document.getElementById('backToMenu').addEventListener('click', () => showModeSelect());
+    document.getElementById('backToMenuTop').addEventListener('click', () => showModeSelect());
 
     document.getElementById('retryExam').addEventListener('click', () => {
         userAnswers = {};
@@ -997,6 +1073,7 @@
     // ─── Init ────────────────────────────────────────────────────────────
     if (!restoreSession()) {
         loadLibrary();
+        renderHistory();
     }
 
 })();
