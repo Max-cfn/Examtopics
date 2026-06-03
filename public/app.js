@@ -858,21 +858,33 @@
             if (filter === 'correct' && !isCorrect) return;
             if (filter === 'incorrect' && isCorrect) return;
 
-            const userDisplay = userLetters.length > 0 ? userLetters.join(', ') : '—';
-            const correctDisplay = q.correctAnswer || '?';
-
+            // Full question text
             html += `<div class="result-question ${isCorrect ? 'is-correct' : 'is-incorrect'}">
                 <div class="result-question-header">
-                    <span>Topic ${q.topic} — Q#${q.number}</span>
+                    <span>Topic ${q.topic} — Question #${q.number}</span>
                     <span class="badge ${isCorrect ? 'correct' : 'incorrect'}">${isCorrect ? '✓ Correct' : '✗ Incorrect'}</span>
                 </div>
-                <div class="result-question-text">${escapeHTML(q.text.substring(0, 150))}${q.text.length > 150 ? '...' : ''}</div>
-                <div class="result-answer-info">
-                    <span class="your-answer">Votre réponse : <strong>${userDisplay}</strong></span>
-                    <span class="correct-answer">Bonne réponse : <strong>${correctDisplay}</strong></span>
+                <div class="result-question-text-full">${escapeHTML(q.text)}</div>
+                <div class="result-choices">`;
+            
+            // Show all choices with correct/incorrect highlighting
+            for (const choice of q.choices) {
+                let cls = 'result-choice';
+                if (correctLetters.includes(choice.letter)) cls += ' correct';
+                if (userLetters.includes(choice.letter) && !correctLetters.includes(choice.letter)) cls += ' incorrect';
+                if (userLetters.includes(choice.letter) && correctLetters.includes(choice.letter)) cls += ' correct';
+                const isUserPick = userLetters.includes(choice.letter);
+                html += `<div class="${cls}">
+                    <span class="result-choice-letter">${choice.letter}</span>
+                    <span class="result-choice-text">${escapeHTML(choice.text)}</span>
+                    ${isUserPick ? '<span class="result-choice-tag your-pick">← Votre réponse</span>' : ''}
+                    ${correctLetters.includes(choice.letter) && !isUserPick ? '<span class="result-choice-tag correct-tag">← Bonne réponse</span>' : ''}
                 </div>`;
-            if (q.explanation) html += `<div class="result-explanation">${escapeHTML(q.explanation.substring(0, 300))}${q.explanation.length > 300 ? '...' : ''}</div>`;
-            if (q.link) html += `<div class="result-link"><a href="${q.link}" target="_blank">🔗 Voir sur ExamTopics</a></div>`;
+            }
+            html += `</div>`;
+
+            if (q.explanation) html += `<div class="result-explanation">${escapeHTML(q.explanation.substring(0, 500))}${q.explanation.length > 500 ? '...' : ''}</div>`;
+            if (q.link) html += `<div class="result-link"><a href="${q.link}" target="_blank">🔗 Voir la discussion sur ExamTopics</a></div>`;
             html += `</div>`;
         });
 

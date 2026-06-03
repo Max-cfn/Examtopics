@@ -995,6 +995,83 @@ a:hover {
     color: var(--text-muted);
 }
 
+.result-question-text-full {
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+    color: var(--text);
+    white-space: pre-wrap;
+    line-height: 1.5;
+}
+
+.result-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-bottom: 0.75rem;
+}
+
+.result-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    font-size: 0.9rem;
+}
+
+.result-choice.correct {
+    border-color: var(--success);
+    background: rgba(16, 185, 129, 0.08);
+}
+
+.result-choice.incorrect {
+    border-color: var(--danger);
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.result-choice-letter {
+    font-weight: 700;
+    min-width: 1.3rem;
+    flex-shrink: 0;
+}
+
+.result-choice.correct .result-choice-letter {
+    color: var(--success);
+}
+.result-choice.incorrect .result-choice-letter {
+    color: var(--danger);
+}
+
+.result-choice-text {
+    flex: 1;
+    color: var(--text-muted);
+}
+.result-choice.correct .result-choice-text,
+.result-choice.incorrect .result-choice-text {
+    color: var(--text);
+}
+
+.result-choice-tag {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.result-choice-tag.your-pick {
+    background: rgba(79, 70, 229, 0.15);
+    color: var(--primary);
+}
+
+.result-choice-tag.correct-tag {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+}
+
 .result-answer-info {
     font-size: 0.9rem;
     display: flex;
