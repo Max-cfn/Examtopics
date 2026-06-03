@@ -626,7 +626,7 @@
         
         document.getElementById('trainProgress').textContent = `${currentIndex + 1}/${currentQuestions.length}`;
         document.getElementById('trainProgressBar').style.width = `${((currentIndex + 1) / currentQuestions.length) * 100}%`;
-        document.getElementById('trainScore').textContent = `Score: ${trainCorrect}/${trainTotal}`;
+        document.getElementById('trainScore').textContent = trainTotal > 0 ? `Score: ${trainCorrect}/${trainTotal} (${Math.round((trainCorrect/trainTotal)*100)}%)` : `Score: 0/0`;
 
         const feedback = document.getElementById('trainFeedback');
         feedback.classList.add('hidden');
@@ -679,7 +679,7 @@
         const isCorrect = userLetters.length === correctLetters.length && userLetters.every(l => correctLetters.includes(l));
         if (isCorrect) trainCorrect++;
 
-        document.getElementById('trainScore').textContent = `Score: ${trainCorrect}/${trainTotal}`;
+        document.getElementById('trainScore').textContent = `Score: ${trainCorrect}/${trainTotal} (${Math.round((trainCorrect/trainTotal)*100)}%)`;
 
         const container = document.getElementById('trainQuestion');
         container.querySelectorAll('.choice').forEach(el => {
