@@ -662,10 +662,22 @@
     }
 
     document.getElementById('trainCheck').addEventListener('click', () => {
-        if (userAnswers[currentIndex] === undefined) {
+        const q = currentQuestions[currentIndex];
+        const answer = userAnswers[currentIndex];
+        
+        if (answer === undefined) {
             alert('Sélectionnez une réponse d\'abord.');
             return;
         }
+        
+        if (q.multiAnswer) {
+            const selected = Array.isArray(answer) ? answer.length : 1;
+            if (selected < q.expectedCount) {
+                alert(`Cette question attend ${q.expectedCount} réponses. Vous en avez sélectionné ${selected}.`);
+                return;
+            }
+        }
+        
         revealTrainingAnswer();
     });
 
