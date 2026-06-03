@@ -1,7 +1,10 @@
 @echo off
 chcp 65001 >nul
 title ExamTopics Practice
-cd /d "%~dp0\.."
+setlocal
+
+set REPO_URL=https://github.com/Max-cfn/Examtopics.git
+set APP_DIR=%USERPROFILE%\Documents\Examtopics
 
 echo.
 echo   ========================================
@@ -12,66 +15,64 @@ echo.
 :: 1. Check Node.js
 where node >nul 2>&1
 if %errorlevel% neq 0 (
-    echo   [!] Node.js non trouve.
-    echo.
-    echo   Installation automatique via winget...
+    echo   [..] Installation de Node.js...
     winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements
     if %errorlevel% neq 0 (
         echo.
-        echo   [X] Echec de l'installation automatique.
-        echo   Installez Node.js manuellement : https://nodejs.org
-        echo.
+        echo   [X] Echec. Installez Node.js : https://nodejs.org
         pause
         exit /b 1
     )
-    echo.
-    echo   [OK] Node.js installe. Redemarrez ce script.
+    echo   [OK] Node.js installe. Relancez ce script.
+    pause
+    exit /b 0
+)
+echo   [OK] Node.js : & node --version
+
+:: 2. Check Git
+where git >nul 2>&1
+if %errorlevel% neq 0 (
+    echo   [..] Installation de Git...
+    winget install Git.Git --accept-package-agreements --accept-source-agreements
+    echo   [OK] Git installe. Relancez ce script.
     pause
     exit /b 0
 )
 
-echo   [OK] Node.js trouve : 
-node --version
-
-:: 2. Check Docker (optional)
-where docker >nul 2>&1
-if %errorlevel% neq 0 (
-    echo   [i] Docker non installe (optionnel, pour telecharger des exams)
-    echo       → winget install Docker.DockerDesktop
-    echo.
+:: 3. Clone or update repo
+if not exist "%APP_DIR%\.git" (
+    echo   [..] Clonage du repo...
+    git clone %REPO_URL% "%APP_DIR%"
+) else (
+    echo   [..] Mise a jour...
+    cd /d "%APP_DIR%"
+    git pull --ff-only 2>nul || echo   [!] Mise a jour impossible (modifications locales?)
 )
 
-:: 3. Install dependencies
+cd /d "%APP_DIR%"
+
+:: 4. Install dependencies
 if not exist "node_modules" (
-    echo   [..] Installation des dependances npm...
+    echo   [..] Installation des dependances...
     call npm install --silent
-    echo   [OK] Dependances installees.
-    echo.
 )
 
-:: 4. Kill existing process on port 3000
+:: 5. Create Desktop shortcut if absent
+if not exist "%USERPROFILE%\Desktop\ExamTopics Practice.bat" (
+    echo   [..] Creation du raccourci Bureau...
+    (
+        echo @echo off
+        echo start "" "%APP_DIR%\installer\start-windows.bat"
+    ) > "%USERPROFILE%\Desktop\ExamTopics Practice.bat"
+)
+
+:: 6. Kill existing process on port 3000
 for /f "tokens=5" %%a in ('netstat -aon ^| findstr :3000 ^| findstr LISTENING') do (
     taskkill /PID %%a /F >nul 2>&1
 )
 
-:: 5. Start server
-echo   [..] Demarrage du serveur...
+:: 7. Start server and open browser
+echo   [OK] Demarrage du serveur...
 echo.
-start /b node server.js
-
-:: 6. Wait for server
-timeout /t 2 /nobreak >nul
-
-:: 7. Open browser
-echo   [OK] Ouverture du navigateur...
-start http://localhost:3000
-
-echo.
-echo   ========================================
-echo   Serveur actif : http://localhost:3000
-echo   Fermez cette fenetre pour arreter.
-echo   ========================================
-echo.
-
-:: Keep window open (server runs in background via start /b)
+start "" http://localhost:3000
 node server.js

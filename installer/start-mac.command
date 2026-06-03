@@ -2,7 +2,8 @@
 # ═══════════════════════════════════════════════════════
 #  ExamTopics Practice - macOS - Double-clic pour lancer
 # ═══════════════════════════════════════════════════════
-cd "$(dirname "$0")/.."
+REPO_URL="https://github.com/Max-cfn/Examtopics.git"
+APP_DIR="$HOME/Documents/Examtopics"
 
 echo ""
 echo "  🎓 ExamTopics Practice"
@@ -18,10 +19,7 @@ if ! command -v brew &> /dev/null; then
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
         eval "$(/opt/homebrew/bin/brew shellenv)"
     fi
-else
-    eval "$(brew shellenv 2>/dev/null)" 2>/dev/null
 fi
-
 if ! command -v brew &> /dev/null && [ -f /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
 fi
@@ -32,27 +30,60 @@ if ! command -v node &> /dev/null; then
     brew install node
 fi
 
-# 3. Docker (optionnel)
-if ! command -v docker &> /dev/null; then
-    echo "  💡 Docker non installé (optionnel, pour télécharger des exams)"
-    echo "     → brew install --cask docker"
-    echo ""
+# 3. Git
+if ! command -v git &> /dev/null; then
+    echo "  📦 Installation de Git..."
+    brew install git
 fi
 
-# 4. Dépendances npm
+# 4. Clone or update repo
+if [ ! -d "$APP_DIR/.git" ]; then
+    echo "  📥 Clonage du repo..."
+    git clone "$REPO_URL" "$APP_DIR"
+else
+    echo "  🔄 Mise à jour..."
+    cd "$APP_DIR"
+    git pull --ff-only 2>/dev/null || echo "  ⚠️  Mise à jour impossible (modifications locales ?)"
+fi
+
+cd "$APP_DIR"
+
+# 5. Dépendances npm
 if [ ! -d "node_modules" ]; then
     echo "  📦 Installation des dépendances..."
     npm install --silent
 fi
 
-# 5. Port 3000
+# Check if package.json changed (new deps)
+if [ "package.json" -nt "node_modules/.package-lock.json" ] 2>/dev/null; then
+    echo "  📦 Mise à jour des dépendances..."
+    npm install --silent
+fi
+
+# 6. Docker (optionnel)
+if ! command -v docker &> /dev/null; then
+    echo "  💡 Docker non installé (optionnel, pour télécharger des exams)"
+    echo ""
+fi
+
+# 7. Créer raccourci Bureau si absent
+DESKTOP_SHORTCUT="$HOME/Desktop/ExamTopics Practice.command"
+if [ ! -f "$DESKTOP_SHORTCUT" ]; then
+    echo "  🖥️  Création du raccourci sur le Bureau..."
+    cat > "$DESKTOP_SHORTCUT" << 'SHORTCUT'
+#!/bin/bash
+exec "$HOME/Documents/Examtopics/installer/start-mac.command"
+SHORTCUT
+    chmod +x "$DESKTOP_SHORTCUT"
+fi
+
+# 8. Port 3000
 if lsof -ti:3000 > /dev/null 2>&1; then
-    echo "  ⚠️  Port 3000 occupé, arrêt du processus existant..."
     lsof -ti:3000 | xargs kill -9 2>/dev/null
     sleep 1
 fi
 
-# 6. Lancer
+# 9. Lancer
 echo "  🚀 Démarrage du serveur..."
 echo ""
 node server.js &
