@@ -317,12 +317,19 @@
         const progressPercent = document.getElementById('dlProgressPercent');
         const progressFill = document.getElementById('dlProgressFill');
         const progressDetail = document.getElementById('dlProgressDetail');
+        const stepIndicator = document.getElementById('dlStepIndicator');
+        const stepLabel = document.getElementById('dlStepLabel');
+        const terminalContent = document.getElementById('dlTerminalContent');
+        const terminal = document.getElementById('dlTerminal');
         
         progressBox.classList.remove('hidden');
-        progressText.textContent = 'Scraping en cours...';
+        progressText.textContent = 'Connexion...';
         progressPercent.textContent = '0%';
         progressFill.style.width = '0%';
-        progressDetail.textContent = 'Connexion au serveur ExamTopics...';
+        progressDetail.textContent = '';
+        stepIndicator.textContent = 'Étape 1/3';
+        stepLabel.textContent = 'Initialisation...';
+        terminalContent.innerHTML = '<span class="log-arrow">▸</span> Démarrage du container Docker...\n';
         
         const interval = setInterval(async () => {
             try {
@@ -331,31 +338,63 @@
                 
                 if (!data.downloading) {
                     clearInterval(interval);
-                    progressText.textContent = '✓ Terminé !';
+                    stepIndicator.textContent = '✓ Terminé';
+                    stepLabel.textContent = 'Fichier sauvegardé !';
+                    progressText.textContent = 'Terminé';
                     progressPercent.textContent = '100%';
                     progressFill.style.width = '100%';
-                    progressDetail.textContent = 'Fichier sauvegardé. Rafraîchissez la bibliothèque.';
+                    progressDetail.textContent = '';
+                    terminalContent.innerHTML += '<span class="log-arrow">▸</span> <span class="log-info">Fichier copié dans exams/</span>\n';
+                    terminalContent.innerHTML += '<span class="log-arrow">▸</span> <span class="log-info">Container supprimé. Terminé !</span>\n';
                     
                     const status = document.getElementById('dlStatus');
                     status.textContent = '✓ Téléchargement terminé ! Fermez cette fenêtre pour voir le résultat.';
                     status.className = 'dl-status success';
                     status.classList.remove('hidden');
                     
+                    // Auto-close after 3s
+                    setTimeout(() => {
+                        progressBox.classList.add('hidden');
+                    }, 5000);
+                    
                     loadLibrary();
                     return;
                 }
                 
+                // Update step
+                if (data.step && data.stepLabel) {
+                    stepIndicator.textContent = `Étape ${data.step}/3`;
+                    stepLabel.textContent = data.stepLabel;
+                }
+                
+                // Update progress bar
                 if (data.progress) {
                     const p = data.progress;
-                    progressText.textContent = `Scraping en cours...`;
+                    progressText.textContent = `Scraping...`;
                     progressPercent.textContent = `${p.percent.toFixed(1)}%`;
                     progressFill.style.width = `${p.percent}%`;
-                    progressDetail.textContent = `${p.current} / ${p.total} questions récupérées`;
+                    progressDetail.textContent = `${p.current} / ${p.total} pages traitées`;
+                }
+                
+                // Update terminal logs
+                if (data.logLines && data.logLines.length > 0) {
+                    let html = '';
+                    for (const line of data.logLines) {
+                        if (line.match(/error|failed/i)) {
+                            html += `<span class="log-error">▸ ${escapeHTML(line)}</span>\n`;
+                        } else if (line.match(/retry|waiting/i)) {
+                            html += `<span class="log-info">▸ ${escapeHTML(line)}</span>\n`;
+                        } else {
+                            html += `<span class="log-arrow">▸</span> ${escapeHTML(line)}\n`;
+                        }
+                    }
+                    terminalContent.innerHTML = html;
+                    terminal.scrollTop = terminal.scrollHeight;
                 }
             } catch {
                 // Silently continue polling
             }
-        }, 3000);
+        }, 2000);
     }
 
     // ─── Mode Selection ──────────────────────────────────────────────────

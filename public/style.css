@@ -447,6 +447,25 @@ a:hover {
 .dl-progress.hidden {
     display: none;
 }
+.dl-progress-step {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.dl-step-indicator {
+    background: var(--primary);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+.dl-step-label {
+    font-size: 0.9rem;
+    color: var(--text);
+    font-weight: 500;
+}
 .dl-progress-header {
     display: flex;
     justify-content: space-between;
@@ -472,6 +491,33 @@ a:hover {
     color: var(--text-muted);
     margin-top: 0.4rem;
     display: block;
+}
+
+.dl-terminal {
+    margin-top: 0.75rem;
+    background: #0a0e17;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    max-height: 120px;
+    overflow-y: auto;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.7rem;
+    line-height: 1.5;
+}
+.dl-terminal-content {
+    color: #6ee7b7;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+.dl-terminal-content .log-error {
+    color: #fca5a5;
+}
+.dl-terminal-content .log-info {
+    color: #93c5fd;
+}
+.dl-terminal-content .log-arrow {
+    color: #a78bfa;
 }
 
 /* Back button */

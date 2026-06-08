@@ -3,7 +3,14 @@
 #  ExamTopics Practice - Linux
 # ═══════════════════════════════════════════════════════
 REPO_URL="https://github.com/Max-cfn/Examtopics.git"
-APP_DIR="$HOME/Documents/Examtopics"
+
+# Déterminer le répertoire
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ "$(basename "$SCRIPT_DIR")" = "installer" ]; then
+    APP_DIR="$(dirname "$SCRIPT_DIR")"
+else
+    APP_DIR="$SCRIPT_DIR"
+fi
 
 echo ""
 echo "  🎓 ExamTopics Practice"
@@ -49,17 +56,25 @@ fi
 cd "$APP_DIR"
 
 # 4. Dépendances
-if [ ! -d "node_modules" ]; then
+if [ ! -d "$APP_DIR/node_modules" ]; then
     echo "  📦 Installation des dépendances..."
     npm install --silent
 fi
-
-if [ "package.json" -nt "node_modules/.package-lock.json" ] 2>/dev/null; then
+if [ "$APP_DIR/package.json" -nt "$APP_DIR/node_modules/.package-lock.json" ] 2>/dev/null; then
     npm install --silent
 fi
 
-# 5. Créer raccourci Bureau
-DESKTOP="$HOME/Desktop"
+# 5. Docker (optionnel)
+if command -v docker &> /dev/null; then
+    if ! docker info &> /dev/null 2>&1; then
+        echo "  🐳 Docker installé mais pas actif. Lancez: sudo systemctl start docker"
+    fi
+else
+    echo "  💡 Docker non installé (optionnel)"
+fi
+
+# 6. Créer raccourci Bureau
+DESKTOP="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
 if [ -d "$DESKTOP" ] && [ ! -f "$DESKTOP/ExamTopics Practice.desktop" ]; then
     echo "  🖥️  Création du raccourci Bureau..."
     cat > "$DESKTOP/ExamTopics Practice.desktop" << EOF
@@ -74,19 +89,24 @@ EOF
     chmod +x "$DESKTOP/ExamTopics Practice.desktop"
 fi
 
-# 6. Port 3000
+# 7. Port 3000
 if command -v lsof &> /dev/null; then
-    lsof -ti:3000 | xargs kill -9 2>/dev/null
+    lsof -ti:3000 2>/dev/null | xargs kill -9 2>/dev/null
 elif command -v fuser &> /dev/null; then
     fuser -k 3000/tcp 2>/dev/null
 fi
+sleep 0.5
 
-# 7. Lancer
+# 8. Lancer
 echo "  🚀 Démarrage du serveur..."
 echo ""
-node server.js &
+node "$APP_DIR/server.js" &
 SERVER_PID=$!
-sleep 2
+
+for i in $(seq 1 10); do
+    if curl -s http://localhost:3000 > /dev/null 2>&1; then break; fi
+    sleep 0.5
+done
 
 if command -v xdg-open &> /dev/null; then
     xdg-open http://localhost:3000

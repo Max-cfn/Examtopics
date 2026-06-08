@@ -268,7 +268,7 @@ app.post('/api/download', (req, res) => {
     });
 });
 
-// API: Check download status with progress
+// API: Check download status with progress and logs
 app.get('/api/download/status', (req, res) => {
     try {
         // Get running containers
@@ -279,8 +279,8 @@ app.get('/api/download/status', (req, res) => {
             return res.json({ downloading: false, containers: [] });
         }
         
-        // Get progress from logs of the first container
-        const logs = execSync(`docker logs ${containers[0]} 2>&1 | tail -5`, { stdio: 'pipe', timeout: 5000 }).toString();
+        // Get full logs from the container
+        const logs = execSync(`docker logs ${containers[0]} 2>&1 | tail -50`, { stdio: 'pipe', timeout: 5000 }).toString();
         
         // Parse progress: "150 / 599 [...] 25.04% 2 p/s"
         const progressMatch = logs.match(/(\d+)\s*\/\s*(\d+)\s*\[.*?\]\s*([\d.]+)%/);
@@ -292,8 +292,32 @@ app.get('/api/download/status', (req, res) => {
                 percent: parseFloat(progressMatch[3])
             };
         }
+
+        // Detect which step we're on
+        let step = 1;
+        let stepLabel = 'Récupération des liens...';
+        const allProgressMatches = [...logs.matchAll(/(\d+)\s*\/\s*(\d+)\s*\[.*?\]\s*([\d.]+)%/g)];
         
-        res.json({ downloading: true, containers, progress });
+        // Count how many times we've hit 100% (each 100% = new step)
+        const completedPasses = (logs.match(/100\.00%/g) || []).length;
+        if (completedPasses >= 2) {
+            step = 3;
+            stepLabel = 'Extraction des commentaires...';
+        } else if (completedPasses >= 1) {
+            step = 2;
+            stepLabel = 'Téléchargement des questions...';
+        } else {
+            step = 1;
+            stepLabel = 'Récupération des liens de discussion...';
+        }
+
+        // Extract recent log lines for the mini terminal
+        const logLines = logs.split('\n')
+            .filter(l => l.trim())
+            .filter(l => !l.match(/^\d+ \/ \d+ \[/)) // Remove progress bars
+            .slice(-15);
+
+        res.json({ downloading: true, containers, progress, step, stepLabel, logLines });
     } catch {
         res.json({ downloading: false, containers: [] });
     }
