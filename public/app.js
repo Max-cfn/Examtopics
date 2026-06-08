@@ -57,12 +57,12 @@
                 for (const exam of group.exams) {
                     html += `
                         <div class="exam-card" data-filename="${exam.filename}">
-                            <button class="exam-card-delete" data-filename="${exam.filename}" title="Supprimer">🗑️</button>
                             <div class="exam-card-title">${escapeHTML(exam.name)}</div>
                             <div class="exam-card-meta">
                                 <span>📝 ${exam.questions} questions</span>
                                 <span>📅 ${new Date(exam.downloadedAt).toLocaleDateString('fr-FR')}</span>
                             </div>
+                            <button class="exam-card-delete" data-filename="${exam.filename}" title="Supprimer">🗑️</button>
                         </div>`;
                 }
                 html += `</div></div>`;
@@ -300,10 +300,11 @@
                     status.textContent += '\n\nCopiez la commande ci-dessous et exécutez-la dans votre terminal.';
                 }
             } else {
-                status.textContent = '✓ Téléchargement lancé ! Rafraîchissez la page dans quelques minutes.';
-                status.className = 'dl-status success';
-                // Poll for completion
-                pollDownloadStatus();
+                // Close modal immediately
+                downloadModal.classList.add('hidden');
+                status.classList.add('hidden');
+                // Inject banner + start polling with grace period
+                injectDownloadBanner(provider, search);
             }
         } catch (err) {
             status.textContent = `Erreur: ${err.message}`;
@@ -502,6 +503,7 @@
         showScreen('home');
         loadLibrary();
         renderHistory();
+        startHomePolling();
     });
 
     // ─── Start Exam ──────────────────────────────────────────────────────
@@ -1121,10 +1123,105 @@
         }
     }
 
+    // ─── Active Downloads (Home Page) ──────────────────────────────────
+    let homePollingInterval = null;
+    let downloadGracePeriod = 0; // cycles to wait before declaring "no download"
+
+    function startHomePolling() {
+        if (homePollingInterval) return;
+        checkActiveDownloads();
+        homePollingInterval = setInterval(checkActiveDownloads, 1000);
+    }
+
+    function stopHomePolling() {
+        if (homePollingInterval) {
+            clearInterval(homePollingInterval);
+            homePollingInterval = null;
+        }
+    }
+
+    async function checkActiveDownloads() {
+        const container = document.getElementById('activeDownloads');
+        try {
+            const res = await fetch('/api/download/status');
+            const data = await res.json();
+
+            if (!data.downloading || !data.downloads || data.downloads.length === 0) {
+                // Grace period: container may still be spinning up
+                if (downloadGracePeriod > 0) {
+                    downloadGracePeriod--;
+                    return; // keep the "starting" banner, keep polling
+                }
+                // Genuinely no download
+                if (container.innerHTML !== '') {
+                    container.innerHTML = '';
+                    loadLibrary();
+                }
+                stopHomePolling();
+                return;
+            }
+
+            // Download detected - cancel grace period
+            downloadGracePeriod = 0;
+
+            let html = '';
+            for (const dl of data.downloads) {
+                const pct = dl.progress ? dl.progress.percent.toFixed(1) : '0';
+                const detail = dl.progress ? `${dl.progress.current}/${dl.progress.total}` : '...';
+                const logs = dl.logLines && dl.logLines.length > 0 ? dl.logLines.map(l => `▸ ${l}`).join('\n') : '▸ En attente...';
+                
+                // Build extra info: speed + ETA
+                let extra = '';
+                if (dl.progress && dl.progress.speed) {
+                    extra += ` · ${dl.progress.speed} p/s`;
+                }
+                if (dl.progress && dl.progress.etaSeconds != null) {
+                    const eta = dl.progress.etaSeconds;
+                    const etaStr = eta > 60 ? `~${Math.round(eta/60)} min` : `~${eta}s`;
+                    extra += ` · reste ${etaStr}`;
+                }
+                
+                html += `<div class="active-download">
+                    <div class="active-download-header">
+                        <h3>⏳ ${escapeHTML(dl.examName || 'Téléchargement')} — ${escapeHTML(dl.stepLabel)}</h3>
+                        <span class="dl-step-indicator">Étape ${dl.step}/3</span>
+                    </div>
+                    <div class="ad-progress-row">
+                        <span>${detail} pages${extra}</span>
+                        <span>${pct}%</span>
+                    </div>
+                    <div class="ad-bar"><div class="ad-bar-fill" style="width:${pct}%"></div></div>
+                    <div class="ad-logs">${escapeHTML(logs)}</div>
+                </div>`;
+            }
+            container.innerHTML = html;
+        } catch {
+            // ignore
+        }
+    }
+
+    function injectDownloadBanner(provider, search) {
+        const container = document.getElementById('activeDownloads');
+        container.innerHTML = `<div class="active-download">
+            <div class="active-download-header">
+                <h3>⏳ ${escapeHTML(provider)} / ${escapeHTML(search)} — Démarrage...</h3>
+                <span class="dl-step-indicator">Étape 1/3</span>
+            </div>
+            <div class="ad-progress-row"><span>...</span><span>0%</span></div>
+            <div class="ad-bar"><div class="ad-bar-fill" style="width:0%"></div></div>
+            <div class="ad-logs">▸ Lancement du container Docker...</div>
+        </div>`;
+        // Grace period of ~10 cycles (20s) for container to spin up
+        downloadGracePeriod = 10;
+        if (homePollingInterval) { clearInterval(homePollingInterval); homePollingInterval = null; }
+        startHomePolling();
+    }
+
     // ─── Init ────────────────────────────────────────────────────────────
     if (!restoreSession()) {
         loadLibrary();
         renderHistory();
+        startHomePolling();
     }
 
 })();

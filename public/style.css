@@ -176,53 +176,53 @@ a:hover {
 }
 
 .provider-exams {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .exam-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.25rem;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
     cursor: pointer;
     transition: all 0.2s;
-    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 .exam-card:hover {
     border-color: var(--primary);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+    background: var(--bg-hover);
 }
 
 .exam-card-title {
-    font-weight: 700;
-    font-size: 1.05rem;
-    margin-bottom: 0.5rem;
-    padding-right: 2rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    flex: 1;
 }
 
 .exam-card-meta {
     display: flex;
     gap: 1rem;
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    flex-shrink: 0;
 }
 
 .exam-card-delete {
-    position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
     background: none;
     border: none;
     color: var(--text-muted);
     cursor: pointer;
-    font-size: 1.1rem;
-    padding: 0.25rem;
+    font-size: 0.9rem;
+    padding: 0.3rem 0.5rem;
     border-radius: 4px;
     opacity: 0;
     transition: all 0.2s;
+    flex-shrink: 0;
+    margin-left: 0.75rem;
 }
 .exam-card:hover .exam-card-delete {
     opacity: 1;
@@ -1179,6 +1179,66 @@ a:hover {
 }
 .filter-tab:hover:not(.active) {
     background: #475569;
+}
+
+/* Active Download Banners on Home */
+.active-downloads {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+.active-downloads:empty {
+    display: none;
+}
+
+.active-download {
+    background: var(--bg-card);
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+}
+.active-download-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.6rem;
+}
+.active-download-header h3 {
+    font-size: 0.9rem;
+    margin: 0;
+}
+.ad-progress-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+}
+.ad-bar {
+    height: 6px;
+    background: var(--bg-hover);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.ad-bar-fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+.ad-logs {
+    margin-top: 0.5rem;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.7rem;
+    color: #6ee7b7;
+    background: #0a0e17;
+    border-radius: 4px;
+    padding: 0.5rem 0.7rem;
+    line-height: 1.6;
+    max-height: 110px;
+    overflow-y: auto;
+    white-space: pre-wrap;
 }
 
 /* Utility */

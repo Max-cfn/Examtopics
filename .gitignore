@@ -5,6 +5,9 @@ node_modules/
 exams/*.md
 !exams/.gitkeep
 
+# Download metadata (temporary, created during scraping)
+exams/.dl-*.json
+
 # OS files
 .DS_Store
 Thumbs.db

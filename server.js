@@ -3,6 +3,14 @@ const fs = require('fs');
 const path = require('path');
 const { execSync, exec } = require('child_process');
 
+// Prevent crashes from unhandled errors
+process.on('uncaughtException', (err) => {
+    console.error('⚠ Uncaught exception (non-fatal):', err.message);
+});
+process.on('unhandledRejection', (err) => {
+    console.error('⚠ Unhandled rejection (non-fatal):', err.message || err);
+});
+
 const app = express();
 const PORT = 3000;
 const EXAMS_DIR = path.join(__dirname, 'exams');
@@ -11,6 +19,13 @@ const EXAMS_DIR = path.join(__dirname, 'exams');
 if (!fs.existsSync(EXAMS_DIR)) {
     fs.mkdirSync(EXAMS_DIR, { recursive: true });
 }
+
+// Clean up orphaned download metadata files from interrupted downloads
+try {
+    fs.readdirSync(EXAMS_DIR)
+        .filter(f => f.startsWith('.dl-') && f.endsWith('.json'))
+        .forEach(f => fs.unlinkSync(path.join(EXAMS_DIR, f)));
+} catch {}
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -64,9 +79,31 @@ app.get('/api/exams', (req, res) => {
                 const stats = fs.statSync(filePath);
                 const content = fs.readFileSync(filePath, 'utf8');
                 const questionCount = (content.match(/^-{3,}$/gm) || []).length - 1;
-                const examMatch = content.match(/Exam\s+([\w\-]+)\s+topic/i);
-                const examName = examMatch ? examMatch[1] : f.replace('.md', '').replace(/_/g, ' ');
+                const examMatch = content.match(/Exam\s+([\w\-\s]+?)\s+topic/i);
                 const provider = detectProvider(f, content);
+                let examName = examMatch ? examMatch[1].trim() : f.replace('.md', '').replace(/_/g, ' ');
+                // Remove provider prefix from name
+                examName = examName
+                    .replace(/_/g, ' ')
+                    .replace(/-/g, ' ');
+                // Remove provider name and common prefixes
+                const prefixes = [
+                    provider.id, provider.name.split(' ')[0].toLowerCase(),
+                    'aws certified', 'aws', 'amazon', 'cisco', 'google', 'microsoft',
+                    'comptia', 'oracle', 'fortinet', 'juniper', 'isaca', 'vmware',
+                    'servicenow', 'ec council', 'paloaltonetworks', 'palo alto', 'isc2', 'salesforce'
+                ];
+                let nameLower = examName.toLowerCase();
+                for (const prefix of prefixes) {
+                    if (nameLower.startsWith(prefix)) {
+                        examName = examName.substring(prefix.length).trim();
+                        nameLower = examName.toLowerCase();
+                    }
+                }
+                // Capitalize first letter
+                if (examName.length > 0) {
+                    examName = examName.charAt(0).toUpperCase() + examName.slice(1);
+                }
                 return {
                     filename: f,
                     name: examName,
@@ -242,84 +279,120 @@ app.post('/api/download', (req, res) => {
 
     const containerName = `examtopics-dl-${Date.now()}`;
     
-    res.json({ status: 'started', containerName, message: `Téléchargement en cours: ${provider} / ${search}...` });
+    // Store download metadata so status endpoint can read the exam name
+    const metaFile = path.join(EXAMS_DIR, `.dl-${containerName}.json`);
+    fs.writeFileSync(metaFile, JSON.stringify({ provider, search, startedAt: new Date().toISOString() }));
+    
+    res.json({ status: 'started', containerName, provider, search, message: `Téléchargement en cours: ${provider} / ${search}...` });
     
     // Run the download with -c flag to include comments/discussions, then copy, then cleanup
     const runCmd = `docker run --name ${containerName} ghcr.io/thatonecodes/examtopics-downloader:latest -p ${provider} -s "${search}" -c -save-links -o output.md`;
     
     exec(runCmd, { timeout: 600000 }, (error) => {
-        // Whether it errored or not, try to copy the output
-        try {
-            execSync(`docker cp ${containerName}:/app/output.md "${outputPath}"`, { stdio: 'pipe' });
-            console.log(`✓ Downloaded: ${outputFile}`);
-        } catch (cpErr) {
-            console.error(`✗ Failed to copy output for ${outputFile}: ${cpErr.message}`);
-        }
-        // Cleanup container
-        try { execSync(`docker rm ${containerName}`, { stdio: 'pipe' }); } catch {}
-        
-        // Verify the file
-        try {
-            const stat = fs.statSync(outputPath);
-            if (stat.size < 500) {
-                console.warn(`⚠ File ${outputFile} seems too small (${stat.size} bytes). Search term may not match any exam.`);
+        // Copy the output file from the container
+        exec(`docker cp ${containerName}:/app/output.md "${outputPath}"`, (cpErr) => {
+            if (cpErr) {
+                console.error(`✗ Failed to copy: ${outputFile}`);
+            } else {
+                console.log(`✓ Downloaded: ${outputFile}`);
+                try {
+                    const stat = fs.statSync(outputPath);
+                    if (stat.size < 500) {
+                        console.warn(`⚠ File ${outputFile} seems too small (${stat.size} bytes)`);
+                    }
+                } catch {}
             }
-        } catch {}
+            // Cleanup container and metadata
+            exec(`docker rm ${containerName}`, () => {});
+            try { fs.unlinkSync(metaFile); } catch {}
+        });
     });
 });
 
-// API: Check download status with progress and logs
+// API: Check download status with progress and logs (supports multiple downloads)
 app.get('/api/download/status', (req, res) => {
     try {
-        // Get running containers
         const running = execSync('docker ps --filter "name=examtopics-dl" --format "{{.Names}}"', { stdio: 'pipe' }).toString().trim();
-        const containers = running ? running.split('\n') : [];
+        const containers = running ? running.split('\n').filter(c => c) : [];
         
         if (containers.length === 0) {
-            return res.json({ downloading: false, containers: [] });
+            return res.json({ downloading: false, downloads: [] });
         }
         
-        // Get full logs from the container
-        const logs = execSync(`docker logs ${containers[0]} 2>&1 | tail -50`, { stdio: 'pipe', timeout: 5000 }).toString();
-        
-        // Parse progress: "150 / 599 [...] 25.04% 2 p/s"
-        const progressMatch = logs.match(/(\d+)\s*\/\s*(\d+)\s*\[.*?\]\s*([\d.]+)%/);
-        let progress = null;
-        if (progressMatch) {
-            progress = {
-                current: parseInt(progressMatch[1]),
-                total: parseInt(progressMatch[2]),
-                percent: parseFloat(progressMatch[3])
-            };
-        }
+        const downloads = containers.map(name => {
+            try {
+                const logs = execSync(`docker logs ${name} 2>&1 | tail -c 5000`, { stdio: 'pipe', timeout: 5000 }).toString();
+                
+                const allMatches = [...logs.matchAll(/(\d+)\s*\/\s*(\d+)\s*\[[^\]]*\]\s*([\d.]+)%(?:\s*([\d.]+)\s*p\/s)?/g)];
+                let progress = null;
+                if (allMatches.length > 0) {
+                    const last = allMatches[allMatches.length - 1];
+                    const current = parseInt(last[1]);
+                    const total = parseInt(last[2]);
+                    const speed = last[4] ? parseFloat(last[4]) : null;
+                    const remaining = speed && speed > 0 ? Math.round((total - current) / speed) : null;
+                    progress = {
+                        current, total,
+                        percent: parseFloat(last[3]),
+                        speed,
+                        etaSeconds: remaining
+                    };
+                }
 
-        // Detect which step we're on
-        let step = 1;
-        let stepLabel = 'Récupération des liens...';
-        const allProgressMatches = [...logs.matchAll(/(\d+)\s*\/\s*(\d+)\s*\[.*?\]\s*([\d.]+)%/g)];
-        
-        // Count how many times we've hit 100% (each 100% = new step)
-        const completedPasses = (logs.match(/100\.00%/g) || []).length;
-        if (completedPasses >= 2) {
-            step = 3;
-            stepLabel = 'Extraction des commentaires...';
-        } else if (completedPasses >= 1) {
-            step = 2;
-            stepLabel = 'Téléchargement des questions...';
-        } else {
-            step = 1;
-            stepLabel = 'Récupération des liens de discussion...';
-        }
+                const completedPasses = (logs.match(/100\.00%/g) || []).length;
+                let step = 1, stepLabel = 'Récupération des liens...';
+                if (completedPasses >= 2) { step = 3; stepLabel = 'Extraction des commentaires...'; }
+                else if (completedPasses >= 1) { step = 2; stepLabel = 'Téléchargement des questions...'; }
 
-        // Extract recent log lines for the mini terminal
-        const logLines = logs.split('\n')
-            .filter(l => l.trim())
-            .filter(l => !l.match(/^\d+ \/ \d+ \[/)) // Remove progress bars
-            .slice(-15);
+                // Read exam name from metadata file
+                let examName = '';
+                const metaFile = path.join(EXAMS_DIR, `.dl-${name}.json`);
+                try {
+                    const meta = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
+                    examName = `${meta.provider} / ${meta.search}`;
+                } catch {
+                    const providerMatch = logs.match(/Fetching \d+ pages for provider '(\w+)'/);
+                    examName = providerMatch ? providerMatch[1] : name;
+                }
 
-        res.json({ downloading: true, containers, progress, step, stepLabel, logLines });
+                const logLines = logs.split(/[\r\n]+/)
+                    .map(l => l.trim())
+                    .filter(l => l.length > 3)
+                    .filter(l => !l.match(/\d+\s*\/\s*\d+\s*\[/))   // remove progress bars
+                    .filter(l => !l.match(/p\/s$/))
+                    .filter(l => !l.match(/^\d+\.\d+%/))
+                    .filter(l => !l.match(/^[\s\-\>\_\#\|\[\]]+$/)) // remove visual noise
+                    .map(l => {
+                        // Make log lines more readable
+                        if (l.match(/cached data failed/i)) return '⚙ Cache GitHub indisponible, passage en scraping direct';
+                        if (l.match(/Fetching (\d+) pages for provider '(\w+)'/i)) {
+                            const m = l.match(/Fetching (\d+) pages for provider '(\w+)'/i);
+                            return `🔍 Scraping de ${m[1]} pages (provider: ${m[2]})`;
+                        }
+                        if (l.match(/status code: 403/i)) return '⚠ HTTP 403 (rate-limit ponctuel, retry auto)';
+                        if (l.match(/status code: 429/i)) return '⚠ HTTP 429 (trop de requêtes, ralentissement)';
+                        if (l.match(/timeout/i)) return '⏱ Timeout réseau sur une page (retry auto)';
+                        if (l.match(/Retry attempt (\d+)/i)) {
+                            const m = l.match(/Retry attempt (\d+) for URL: (\S+)/i);
+                            return m ? `🔄 Nouvelle tentative #${m[1]}` : '🔄 Nouvelle tentative';
+                        }
+                        if (l.match(/Successfully saved/i)) return '💾 Sauvegarde du fichier...';
+                        if (l.match(/response body was nil/i)) return '⚠ Réponse vide (ignorée)';
+                        if (l.match(/failed to fetch/i)) return '⚠ Échec de récupération (retry auto)';
+                        if (l.match(/Failed to parse HTML/i)) return '⚠ Page non parsable (ignorée)';
+                        return l;
+                    })
+                    .slice(-6);
+
+                return { name, progress, step, stepLabel, examName, logLines };
+            } catch {
+                return { name, progress: null, step: 1, stepLabel: 'Démarrage...', examName: name, logLines: [] };
+            }
+        });
+
+        res.json({ downloading: true, downloads });
     } catch {
-        res.json({ downloading: false, containers: [] });
+        res.json({ downloading: false, downloads: [] });
     }
 });
 
