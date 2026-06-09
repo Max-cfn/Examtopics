@@ -496,6 +496,7 @@
         userAnswers = {};
         trainCorrect = 0;
         trainTotal = 0;
+        currentQuizType = `Quiz ${batchIdx + 1} (Q${sorted[start].number}–${sorted[end-1].number})`;
 
         if (mode === 'exam') {
             const minutes = parseInt(document.getElementById('examTime').value) || 30;
@@ -606,6 +607,7 @@
         const shuffle = document.getElementById('examShuffle').checked;
 
         mode = 'exam';
+        currentQuizType = '';
         currentQuestions = selectQuestions(count, shuffle);
         currentIndex = 0;
         userAnswers = {};
@@ -627,6 +629,7 @@
         const shuffle = document.getElementById('trainShuffle').checked;
 
         mode = 'training';
+        currentQuizType = '';
         currentQuestions = selectQuestions(count, shuffle);
         currentIndex = 0;
         userAnswers = {};
@@ -939,6 +942,8 @@
     }
 
     // ─── History ───────────────────────────────────────────────────────────
+    let currentQuizType = ''; // 'batch-3', 'custom', 'all', etc.
+
     function saveToHistory(correct, incorrect, unanswered, total, score) {
         const history = JSON.parse(localStorage.getItem('quizHistory') || '[]');
         const rangeType = document.querySelector('input[name="questionRange"]:checked')?.value || 'all';
@@ -948,21 +953,42 @@
         else if (rangeType === 'first') rangeDesc = `${document.getElementById('rangeN')?.value || '?'} premières`;
         else if (rangeType === 'range') rangeDesc = `Q${document.getElementById('rangeFrom')?.value || '?'}–${document.getElementById('rangeTo')?.value || '?'}`;
 
+        // Store detailed results for review
+        const details = currentQuestions.map((q, i) => {
+            const answer = userAnswers[i];
+            const userLetters = Array.isArray(answer) ? answer : (answer ? [answer] : []);
+            const correctLetters = q.correctAnswer ? q.correctAnswer.split('') : [];
+            return {
+                number: q.number,
+                text: q.text.substring(0, 200),
+                choices: q.choices,
+                correctAnswer: q.correctAnswer,
+                userAnswer: userLetters,
+                isCorrect: userLetters.length === correctLetters.length && userLetters.every(l => correctLetters.includes(l)),
+                link: q.link,
+                explanation: q.explanation ? q.explanation.substring(0, 300) : ''
+            };
+        });
+
+        const id = `hist-${Date.now()}`;
         history.unshift({
+            id,
             date: new Date().toISOString(),
             exam: currentExamName,
             mode: mode === 'exam' ? 'Examen' : 'Entraînement',
+            quizType: currentQuizType || rangeDesc,
             total,
             correct,
             incorrect,
             unanswered,
             score,
             range: rangeDesc,
-            shuffled: mode === 'exam' ? document.getElementById('examShuffle')?.checked : document.getElementById('trainShuffle')?.checked
+            shuffled: mode === 'exam' ? document.getElementById('examShuffle')?.checked : document.getElementById('trainShuffle')?.checked,
+            details
         });
 
-        // Keep last 50 entries
-        if (history.length > 50) history.length = 50;
+        // Keep last 30 entries (with details they're bigger)
+        if (history.length > 30) history.length = 30;
         localStorage.setItem('quizHistory', JSON.stringify(history));
     }
 
@@ -976,22 +1002,22 @@
         }
 
         let html = `<div class="history-header-row">
-            <span>Date</span><span>Exam</span><span>Mode</span><span>Questions</span><span>Score</span><span>Plage</span>
+            <span>Date</span><span>Exam</span><span>Type</span><span>Score</span><span>Détails</span>
         </div>`;
 
-        for (const entry of history.slice(0, 20)) {
+        for (const [idx, entry] of history.slice(0, 20).entries()) {
             const date = new Date(entry.date);
             const dateStr = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
             const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
             const scoreClass = entry.score >= 80 ? 'good' : entry.score >= 60 ? 'medium' : 'bad';
+            const typeLabel = entry.quizType || entry.range || '—';
             
             html += `<div class="history-row">
                 <span class="history-date">${dateStr} ${timeStr}</span>
-                <span class="history-exam">${escapeHTML(entry.exam)}</span>
-                <span class="history-mode">${entry.mode}</span>
-                <span class="history-questions">${entry.correct}/${entry.total} ${entry.shuffled ? '🔀' : ''}</span>
-                <span class="history-score ${scoreClass}">${entry.score}%</span>
-                <span class="history-range">${entry.range}</span>
+                <span class="history-exam">${escapeHTML(entry.exam || '')}</span>
+                <span class="history-mode">${entry.mode} · ${escapeHTML(typeLabel)}</span>
+                <span class="history-score ${scoreClass}">${entry.score}% (${entry.correct}/${entry.total})</span>
+                <span><button class="btn btn-sm btn-secondary history-review-btn" data-idx="${idx}">👁 Revoir</button></span>
             </div>`;
         }
 
@@ -1001,12 +1027,97 @@
 
         container.innerHTML = html;
 
+        // Bind review buttons
+        container.querySelectorAll('.history-review-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.idx);
+                showHistoryReview(history[idx]);
+            });
+        });
+
         document.getElementById('clearHistory')?.addEventListener('click', () => {
             if (confirm('Effacer tout l\'historique ?')) {
                 localStorage.removeItem('quizHistory');
                 renderHistory();
             }
         });
+    }
+
+    function showHistoryReview(entry) {
+        if (!entry.details || entry.details.length === 0) {
+            alert('Pas de détails disponibles pour cette session (ancien format).');
+            return;
+        }
+
+        // Reuse the results screen
+        document.getElementById('resultsTitle').textContent = `📊 Review : ${entry.exam} — ${entry.quizType || ''}`;
+        
+        const score = entry.score;
+        document.getElementById('resultsSummary').innerHTML = `
+            <div class="result-card score"><div class="value">${score}%</div><div class="label">Score</div></div>
+            <div class="result-card correct-count"><div class="value">${entry.correct}</div><div class="label">Correctes</div></div>
+            <div class="result-card incorrect-count"><div class="value">${entry.incorrect}</div><div class="label">Incorrectes</div></div>
+            <div class="result-card"><div class="value">${entry.unanswered}</div><div class="label">Sans réponse</div></div>
+        `;
+
+        // Render detailed review
+        let html = `<h2>Détail des questions</h2>
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-hfilter="all">Toutes (${entry.total})</button>
+                <button class="filter-tab" data-hfilter="correct">Correctes (${entry.correct})</button>
+                <button class="filter-tab" data-hfilter="incorrect">Incorrectes (${entry.incorrect + entry.unanswered})</button>
+            </div>
+            <div id="historyResultsList"></div>`;
+        document.getElementById('resultsDetails').innerHTML = html;
+
+        renderHistoryResults(entry.details, 'all');
+
+        document.querySelectorAll('[data-hfilter]').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('[data-hfilter]').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                renderHistoryResults(entry.details, tab.dataset.hfilter);
+            });
+        });
+
+        showScreen('results');
+    }
+
+    function renderHistoryResults(details, filter) {
+        let html = '';
+        for (const d of details) {
+            if (filter === 'correct' && !d.isCorrect) continue;
+            if (filter === 'incorrect' && d.isCorrect) continue;
+
+            const userDisplay = d.userAnswer.length > 0 ? d.userAnswer.join(', ') : '—';
+            const correctLetters = d.correctAnswer ? d.correctAnswer.split('') : [];
+
+            html += `<div class="result-question ${d.isCorrect ? 'is-correct' : 'is-incorrect'}">
+                <div class="result-question-header">
+                    <span>Question #${d.number}</span>
+                    <span class="badge ${d.isCorrect ? 'correct' : 'incorrect'}">${d.isCorrect ? '✓' : '✗'}</span>
+                </div>
+                <div class="result-question-text-full">${escapeHTML(d.text)}</div>
+                <div class="result-choices">`;
+
+            for (const choice of d.choices) {
+                let cls = 'result-choice';
+                if (correctLetters.includes(choice.letter)) cls += ' correct';
+                if (d.userAnswer.includes(choice.letter) && !correctLetters.includes(choice.letter)) cls += ' incorrect';
+                const isUserPick = d.userAnswer.includes(choice.letter);
+                html += `<div class="${cls}">
+                    <span class="result-choice-letter">${choice.letter}</span>
+                    <span class="result-choice-text">${escapeHTML(choice.text)}</span>
+                    ${isUserPick ? '<span class="result-choice-tag your-pick">← Vous</span>' : ''}
+                    ${correctLetters.includes(choice.letter) && !isUserPick ? '<span class="result-choice-tag correct-tag">← Correct</span>' : ''}
+                </div>`;
+            }
+            html += `</div>`;
+            if (d.explanation) html += `<div class="result-explanation">${escapeHTML(d.explanation)}</div>`;
+            if (d.link) html += `<div class="result-link"><a href="${d.link}" target="_blank">🔗 ExamTopics</a></div>`;
+            html += `</div>`;
+        }
+        document.getElementById('historyResultsList').innerHTML = html || '<p style="color:var(--text-muted);text-align:center;">Aucune.</p>';
     }
 
     // ─── Results ─────────────────────────────────────────────────────────
@@ -1113,8 +1224,14 @@
     }
 
     // ─── Results Actions ─────────────────────────────────────────────────
-    document.getElementById('backToMenu').addEventListener('click', () => showModeSelect());
-    document.getElementById('backToMenuTop').addEventListener('click', () => showModeSelect());
+    document.getElementById('backToMenu').addEventListener('click', () => {
+        if (allQuestions.length > 0) showModeSelect();
+        else { showScreen('home'); loadLibrary(); renderHistory(); startHomePolling(); }
+    });
+    document.getElementById('backToMenuTop').addEventListener('click', () => {
+        if (allQuestions.length > 0) showModeSelect();
+        else { showScreen('home'); loadLibrary(); renderHistory(); startHomePolling(); }
+    });
 
     document.getElementById('retryExam').addEventListener('click', () => {
         userAnswers = {};

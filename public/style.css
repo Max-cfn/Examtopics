@@ -1348,7 +1348,7 @@ a:hover {
 
 .history-header-row {
     display: grid;
-    grid-template-columns: 120px 1fr 90px 90px 60px 100px;
+    grid-template-columns: 100px 1fr 1fr 80px 70px;
     gap: 0.5rem;
     padding: 0.6rem 1rem;
     background: var(--bg-hover);
@@ -1361,7 +1361,7 @@ a:hover {
 
 .history-row {
     display: grid;
-    grid-template-columns: 120px 1fr 90px 90px 60px 100px;
+    grid-template-columns: 100px 1fr 1fr 80px 70px;
     gap: 0.5rem;
     padding: 0.6rem 1rem;
     font-size: 0.85rem;
@@ -1412,9 +1412,7 @@ a:hover {
         grid-template-columns: 80px 1fr 70px 60px;
     }
     .history-header-row span:nth-child(5),
-    .history-header-row span:nth-child(6),
-    .history-row span:nth-child(5),
-    .history-row span:nth-child(6) {
+    .history-row span:nth-child(5) {
         display: none;
     }
 }
