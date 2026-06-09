@@ -27,6 +27,21 @@ try {
         .forEach(f => fs.unlinkSync(path.join(EXAMS_DIR, f)));
 } catch {}
 
+// Custom exam names (user renames) stored in a JSON map: filename -> custom name
+const NAMES_FILE = path.join(EXAMS_DIR, '.custom-names.json');
+
+function loadCustomNames() {
+    try {
+        return JSON.parse(fs.readFileSync(NAMES_FILE, 'utf8'));
+    } catch {
+        return {};
+    }
+}
+
+function saveCustomNames(names) {
+    fs.writeFileSync(NAMES_FILE, JSON.stringify(names, null, 2));
+}
+
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
@@ -79,34 +94,22 @@ app.get('/api/exams', (req, res) => {
                 const stats = fs.statSync(filePath);
                 const content = fs.readFileSync(filePath, 'utf8');
                 const questionCount = (content.match(/^-{3,}$/gm) || []).length - 1;
-                const examMatch = content.match(/Exam\s+([\w\-\s]+?)\s+topic/i);
+                // Try multiple header formats to extract the exam name
+                let examMatch = content.match(/##\s*Exam\s+(.+?)\s+topic/i)       // "Exam X topic Y question"
+                             || content.match(/##\s*Examtopics\s+(.+?)(?:_\d+)?\s+question/i)  // "Examtopics X_NN question"
+                             || content.match(/Exam\s+(.+?)\s+topic/i);
                 const provider = detectProvider(f, content);
-                let examName = examMatch ? examMatch[1].trim() : f.replace('.md', '').replace(/_/g, ' ');
-                // Remove provider prefix from name
-                examName = examName
-                    .replace(/_/g, ' ')
-                    .replace(/-/g, ' ');
-                // Remove provider name and common prefixes
-                const prefixes = [
-                    provider.id, provider.name.split(' ')[0].toLowerCase(),
-                    'aws certified', 'aws', 'amazon', 'cisco', 'google', 'microsoft',
-                    'comptia', 'oracle', 'fortinet', 'juniper', 'isaca', 'vmware',
-                    'servicenow', 'ec council', 'paloaltonetworks', 'palo alto', 'isc2', 'salesforce'
-                ];
-                let nameLower = examName.toLowerCase();
-                for (const prefix of prefixes) {
-                    if (nameLower.startsWith(prefix)) {
-                        examName = examName.substring(prefix.length).trim();
-                        nameLower = examName.toLowerCase();
-                    }
-                }
-                // Capitalize first letter
-                if (examName.length > 0) {
-                    examName = examName.charAt(0).toUpperCase() + examName.slice(1);
-                }
+                // Use the raw exam name from the file content, or fallback to filename
+                let examName = examMatch ? examMatch[1].trim() : f.replace(/\.md$/, '').replace(/_/g, ' ');
+                
+                // Apply custom name if user renamed it
+                const customNames = loadCustomNames();
+                const displayName = customNames[f] || examName;
                 return {
                     filename: f,
-                    name: examName,
+                    name: displayName,
+                    originalName: examName,
+                    isCustom: !!customNames[f],
                     provider: provider.id,
                     providerName: provider.name,
                     size: stats.size,
@@ -151,6 +154,29 @@ app.delete('/api/exams/:filename', (req, res) => {
         return res.status(404).json({ error: 'Exam not found' });
     }
     fs.unlinkSync(filePath);
+    // Also remove any custom name entry
+    const names = loadCustomNames();
+    if (names[req.params.filename]) {
+        delete names[req.params.filename];
+        saveCustomNames(names);
+    }
+    res.json({ success: true });
+});
+
+// API: Rename an exam (custom display name)
+app.put('/api/exams/:filename/rename', express.json(), (req, res) => {
+    const filePath = path.join(EXAMS_DIR, req.params.filename);
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'Exam not found' });
+    }
+    const { name } = req.body;
+    const names = loadCustomNames();
+    if (name && name.trim()) {
+        names[req.params.filename] = name.trim();
+    } else {
+        delete names[req.params.filename]; // empty = reset to original
+    }
+    saveCustomNames(names);
     res.json({ success: true });
 });
 

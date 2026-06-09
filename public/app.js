@@ -57,11 +57,12 @@
                 for (const exam of group.exams) {
                     html += `
                         <div class="exam-card" data-filename="${exam.filename}">
-                            <div class="exam-card-title">${escapeHTML(exam.name)}</div>
+                            <div class="exam-card-title">${escapeHTML(exam.name)}${exam.isCustom ? ' <span class="custom-badge">✎</span>' : ''}</div>
                             <div class="exam-card-meta">
                                 <span>📝 ${exam.questions} questions</span>
                                 <span>📅 ${new Date(exam.downloadedAt).toLocaleDateString('fr-FR')}</span>
                             </div>
+                            <button class="exam-card-rename" data-filename="${exam.filename}" data-name="${escapeHTML(exam.name)}" title="Renommer">✏️</button>
                             <button class="exam-card-delete" data-filename="${exam.filename}" title="Supprimer">🗑️</button>
                         </div>`;
                 }
@@ -73,6 +74,7 @@
             container.querySelectorAll('.exam-card').forEach(card => {
                 card.addEventListener('click', (e) => {
                     if (e.target.classList.contains('exam-card-delete')) return;
+                    if (e.target.classList.contains('exam-card-rename')) return;
                     loadExam(card.dataset.filename);
                 });
             });
@@ -86,6 +88,23 @@
                         await fetch(`/api/exams/${filename}`, { method: 'DELETE' });
                         loadLibrary();
                     }
+                });
+            });
+
+            // Bind rename buttons
+            container.querySelectorAll('.exam-card-rename').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const filename = btn.dataset.filename;
+                    const currentName = btn.dataset.name;
+                    const newName = prompt('Nouveau nom de la certification :\n(laisser vide pour réinitialiser au nom d\'origine)', currentName);
+                    if (newName === null) return; // cancelled
+                    await fetch(`/api/exams/${filename}/rename`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: newName })
+                    });
+                    loadLibrary();
                 });
             });
         } catch (err) {
