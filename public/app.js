@@ -437,7 +437,76 @@
         document.getElementById('rangeN').value = Math.min(50, allQuestions.length);
         updateRangePreview();
 
+        // Generate pre-made quiz batches
+        generateQuizBatches();
+
         showScreen('modeSelect');
+    }
+
+    function generateQuizBatches() {
+        const sorted = [...allQuestions].sort((a, b) => parseInt(a.number) - parseInt(b.number));
+        const batchSize = 50;
+        const container = document.getElementById('quizBatches');
+        const totalBatches = Math.ceil(sorted.length / batchSize);
+
+        let html = '';
+        for (let i = 0; i < totalBatches; i++) {
+            const start = i * batchSize;
+            const end = Math.min(start + batchSize, sorted.length);
+            const startNum = sorted[start].number;
+            const endNum = sorted[end - 1].number;
+            const count = end - start;
+
+            html += `<div class="quiz-batch-btn" data-batch="${i}">
+                <span class="batch-label">Quiz ${i + 1}</span>
+                <span class="batch-range">Q${startNum}–${endNum} (${count})</span>
+                <div class="quiz-batch-actions">
+                    <button class="btn btn-sm btn-primary batch-exam" data-batch="${i}">📝 Exam</button>
+                    <button class="btn btn-sm btn-secondary batch-train" data-batch="${i}">📚 Review</button>
+                </div>
+            </div>`;
+        }
+        container.innerHTML = html;
+
+        // Bind batch buttons
+        container.querySelectorAll('.batch-exam').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                startBatchQuiz(parseInt(btn.dataset.batch), 'exam');
+            });
+        });
+        container.querySelectorAll('.batch-train').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                startBatchQuiz(parseInt(btn.dataset.batch), 'training');
+            });
+        });
+    }
+
+    function startBatchQuiz(batchIdx, quizMode) {
+        const sorted = [...allQuestions].sort((a, b) => parseInt(a.number) - parseInt(b.number));
+        const batchSize = 50;
+        const start = batchIdx * batchSize;
+        const end = Math.min(start + batchSize, sorted.length);
+        const batchQuestions = sorted.slice(start, end);
+
+        mode = quizMode;
+        currentQuestions = batchQuestions;
+        currentIndex = 0;
+        userAnswers = {};
+        trainCorrect = 0;
+        trainTotal = 0;
+
+        if (mode === 'exam') {
+            const minutes = parseInt(document.getElementById('examTime').value) || 30;
+            timeRemaining = minutes * 60;
+            showScreen('exam');
+            renderExamQuestion();
+            startTimer();
+        } else {
+            showScreen('training');
+            renderTrainingQuestion();
+        }
     }
 
     // Range selector logic
