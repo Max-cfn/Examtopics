@@ -303,36 +303,50 @@ app.post('/api/download', (req, res) => {
         });
     }
 
-    const containerName = `examtopics-dl-${Date.now()}`;
-    
-    // Store download metadata so status endpoint can read the exam name
-    const metaFile = path.join(EXAMS_DIR, `.dl-${containerName}.json`);
-    fs.writeFileSync(metaFile, JSON.stringify({ provider, search, startedAt: new Date().toISOString() }));
-    
-    res.json({ status: 'started', containerName, provider, search, message: `Téléchargement en cours: ${provider} / ${search}...` });
-    
-    // Run the download with -c flag to include comments/discussions, then copy, then cleanup
-    const runCmd = `docker run --name ${containerName} ghcr.io/thatonecodes/examtopics-downloader:latest -p ${provider} -s "${search}" -c -save-links -o output.md`;
-    
-    exec(runCmd, { timeout: 600000 }, (error) => {
-        // Copy the output file from the container
-        exec(`docker cp ${containerName}:/app/output.md "${outputPath}"`, (cpErr) => {
-            if (cpErr) {
-                console.error(`✗ Failed to copy: ${outputFile}`);
-            } else {
-                console.log(`✓ Downloaded: ${outputFile}`);
-                try {
-                    const stat = fs.statSync(outputPath);
-                    if (stat.size < 500) {
-                        console.warn(`⚠ File ${outputFile} seems too small (${stat.size} bytes)`);
-                    }
-                } catch {}
-            }
-            // Cleanup container and metadata
-            exec(`docker rm ${containerName}`, () => {});
-            try { fs.unlinkSync(metaFile); } catch {}
+    res.json({ status: 'started', provider, search, message: `Téléchargement en cours: ${provider} / ${search}...` });
+
+    // FULL live scrape (-no-cache) every time, WITH community discussions (-c)
+    // so answers are reliable, following the downloader's own method.
+    //
+    // -s is grepped against examtopics DISCUSSION links, whose slug examtopics
+    // truncates by dropping the exam version code (e.g. the exam page
+    // ".../aws-...-mla-c01/" has discussion links ".../...-mla..."). Passing the
+    // full catalog slug therefore matches 0 links -> empty file. So we strip the
+    // trailing AWS version code ("-c01", "-c02", ...) for the search term, and
+    // fall back to the full slug if the trimmed one yields nothing.
+    const trimmed = search.replace(/-c\d+$/i, '');
+    const searchVariants = trimmed !== search ? [trimmed, search] : [search];
+
+    function attempt(idx) {
+        const searchTerm = searchVariants[idx];
+        const containerName = `examtopics-dl-${Date.now()}`;
+        const metaFile = path.join(EXAMS_DIR, `.dl-${containerName}.json`);
+        // status endpoint reads the exam name from here
+        try { fs.writeFileSync(metaFile, JSON.stringify({ provider, search, searchTerm, startedAt: new Date().toISOString() })); } catch {}
+
+        const runCmd = `docker run --name ${containerName} ghcr.io/thatonecodes/examtopics-downloader:latest -p ${provider} -s "${searchTerm}" -no-cache -c -save-links -o output.md`;
+
+        exec(runCmd, { timeout: 900000 }, () => {
+            exec(`docker cp ${containerName}:/app/output.md "${outputPath}"`, (cpErr) => {
+                let size = 0;
+                try { size = fs.statSync(outputPath).size; } catch {}
+                exec(`docker rm ${containerName}`, () => {});
+                try { fs.unlinkSync(metaFile); } catch {}
+
+                // Retry with the next search variant if this one came back empty
+                if ((cpErr || size < 500) && idx + 1 < searchVariants.length) {
+                    console.warn(`⚠ "${searchTerm}" returned nothing, retrying with "${searchVariants[idx + 1]}"`);
+                    return attempt(idx + 1);
+                }
+                if (cpErr || size < 500) {
+                    console.error(`✗ ${outputFile}: empty after ${idx + 1} attempt(s)`);
+                } else {
+                    console.log(`✓ Downloaded: ${outputFile} (${size} bytes) via "${searchTerm}"`);
+                }
+            });
         });
-    });
+    }
+    attempt(0);
 });
 
 // API: Check download status with progress and logs (supports multiple downloads)
