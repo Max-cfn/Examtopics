@@ -49,6 +49,7 @@ app.use(express.json());
 // Known providers for matching
 const PROVIDERS = [
     { id: 'amazon', name: 'Amazon (AWS)', keywords: ['aws', 'amazon'] },
+    { id: 'hashicorp', name: 'HashiCorp', keywords: ['hashicorp', 'terraform', 'vault', 'consul'] },
     { id: 'cisco', name: 'Cisco', keywords: ['cisco'] },
     { id: 'comptia', name: 'CompTIA', keywords: ['comptia'] },
     { id: 'google', name: 'Google Cloud', keywords: ['google', 'gcp'] },
@@ -196,6 +197,7 @@ app.post('/api/exams/upload', express.text({ limit: '50mb' }), (req, res) => {
 app.get('/api/providers', (req, res) => {
     const providers = [
         { id: 'amazon', name: 'Amazon (AWS)', description: 'AWS Certifications' },
+        { id: 'hashicorp', name: 'HashiCorp (Terraform)', description: 'Terraform, Vault, Consul' },
         { id: 'cisco', name: 'Cisco', description: 'CCNA, CCNP, etc.' },
         { id: 'comptia', name: 'CompTIA', description: 'A+, Security+, Network+, etc.' },
         { id: 'google', name: 'Google Cloud', description: 'GCP Certifications' },
