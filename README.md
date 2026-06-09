@@ -2,17 +2,36 @@
 
 Site local pour s'entraîner aux certifications IT à partir des questions téléchargées via [examtopics-downloader](https://github.com/thatonecodes/examtopics-downloader).
 
-## Lancement
+## Installation
 
-Double-cliquez sur le fichier correspondant à votre OS dans le dossier `installer/` :
+### 🍎 macOS — installation en 1 ligne
 
-| OS | Fichier | Action |
-|----|---------|--------|
-| macOS | `installer/start-mac.command` | Double-clic dans le Finder |
-| Windows | `installer/start-windows.bat` | Double-clic |
-| Linux | `installer/start-linux.sh` | `./installer/start-linux.sh` |
+Ouvrez **Terminal** (Spotlight → tapez « Terminal ») et collez cette commande :
 
-Le script installe tout automatiquement au premier lancement (Node.js, dépendances), puis lance directement les fois suivantes.
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Max-cfn/Examtopics/main/installer/install-mac.sh)"
+```
+
+Elle installe tout (Homebrew, Node.js, Git), télécharge l'app, la lance, et crée
+un raccourci **« ExamTopics Practice »** sur le Bureau. **Les fois suivantes :
+double-clic sur le raccourci du Bureau** (2 clics, sans alerte).
+
+> **Pourquoi pas un simple double-clic au départ ?** macOS (Gatekeeper) bloque
+> les scripts téléchargés en `.zip` (« logiciel non vérifié »). L'installation via
+> `curl`/`git clone` évite ce blocage — aucun fichier n'est mis en quarantaine,
+> et le raccourci du Bureau est créé localement.
+
+### 🪟 Windows
+
+Téléchargez le dépôt, puis double-cliquez sur `installer/start-windows.bat`.
+Il installe Node.js (via winget) et les dépendances au premier lancement.
+
+### 🐧 Linux
+
+```bash
+git clone https://github.com/Max-cfn/Examtopics.git ~/Examtopics
+cd ~/Examtopics && ./installer/start-linux.sh
+```
 
 Le site s'ouvre sur **http://localhost:3000**.
 

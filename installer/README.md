@@ -2,16 +2,28 @@
 
 Scripts de lancement en 1 clic. Double-cliquez sur celui de votre OS.
 
-## macOS → `start-mac.command`
+## macOS → installation en 1 ligne (recommandé)
 
-Double-cliquez dans le Finder. Au premier lancement il installe :
-- Homebrew (si absent)
-- Node.js (si absent)
-- Dépendances npm
+Ouvrez **Terminal** et collez :
 
-Les fois suivantes il lance directement (~2s).
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Max-cfn/Examtopics/main/installer/install-mac.sh)"
+```
 
-> Si macOS bloque l'exécution : clic droit → Ouvrir → Ouvrir quand même.
+`install-mac.sh` installe Homebrew + Node.js + Git, fait un `git clone` du dépôt
+dans `~/Documents/Examtopics`, puis lance `start-mac.command`. Un raccourci
+**« ExamTopics Practice »** est créé sur le Bureau.
+
+**Les fois suivantes : double-clic sur le raccourci du Bureau** (2 clics, sans alerte).
+
+> **Pourquoi pas le double-clic direct du `.command` ?** Téléchargé dans un `.zip`,
+> macOS le met en quarantaine (`com.apple.quarantine`) et Gatekeeper le bloque
+> (« logiciel non vérifié »), car le script n'est ni signé ni notarisé par Apple.
+> `curl` et `git clone` ne posent pas cet attribut → pas de blocage. Le raccourci
+> du Bureau étant créé localement, il n'est pas quarantiné non plus.
+>
+> Si tu as quand même un `start-mac.command` bloqué (récupéré via zip) :
+> clic droit → **Ouvrir**, ou retire la quarantaine : `xattr -cr <dossier>`.
 
 ## Windows → `start-windows.bat`
 
