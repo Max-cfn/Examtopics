@@ -710,9 +710,12 @@
                 if (!Array.isArray(current)) current = [current];
                 if (current.includes(letter)) {
                     current = current.filter(l => l !== letter);
-                } else {
+                } else if (current.length < q.expectedCount) {
+                    // Ne pas dépasser le nombre de réponses attendues
                     current.push(letter);
                     current.sort();
+                } else {
+                    return; // limite atteinte : clic ignoré
                 }
                 userAnswers[currentIndex] = current.length > 0 ? current : undefined;
             } else {
@@ -776,9 +779,12 @@
                 if (!Array.isArray(current)) current = [current];
                 if (current.includes(letter)) {
                     current = current.filter(l => l !== letter);
-                } else {
+                } else if (current.length < q.expectedCount) {
+                    // Ne pas dépasser le nombre de réponses attendues
                     current.push(letter);
                     current.sort();
+                } else {
+                    return; // limite atteinte : clic ignoré
                 }
                 userAnswers[currentIndex] = current.length > 0 ? current : undefined;
             } else {
