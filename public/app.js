@@ -1285,10 +1285,19 @@
             timeRemaining,
             trainCorrect,
             trainTotal,
-            currentExamName,
-            allQuestions
+            currentExamName
+            // NB : on NE stocke PAS allQuestions (le pool complet). Sur les gros
+            // exams scrapés avec commentaires (plusieurs Mo), le JSON dépasse le
+            // quota de sessionStorage (~5 Mo) et setItem lève QuotaExceededError,
+            // ce qui cassait tous les clics (choix / Suivant / Précédent).
         };
-        sessionStorage.setItem('examSession', JSON.stringify(state));
+        try {
+            sessionStorage.setItem('examSession', JSON.stringify(state));
+        } catch (e) {
+            // Quota dépassé ou storage indisponible : on dégrade silencieusement
+            // sans jamais bloquer le déroulement du quiz.
+            try { sessionStorage.removeItem('examSession'); } catch {}
+        }
     }
 
     function clearSession() {
@@ -1311,7 +1320,10 @@
             trainCorrect = state.trainCorrect;
             trainTotal = state.trainTotal;
             currentExamName = state.currentExamName;
-            allQuestions = state.allQuestions;
+            // allQuestions (pool complet) n'est plus persisté pour rester sous le
+            // quota de sessionStorage. La session restaurée rejoue currentQuestions ;
+            // "Retour au menu" renverra à l'accueil plutôt qu'au mode-select.
+            allQuestions = state.allQuestions || [];
 
             if (mode === 'exam') {
                 showScreen('exam');
