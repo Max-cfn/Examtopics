@@ -312,12 +312,13 @@ app.post('/api/download', (req, res) => {
     //
     // -s is grepped against examtopics DISCUSSION links, whose slug examtopics
     // truncates by dropping the exam version code (e.g. the exam page
-    // ".../aws-...-mla-c01/" has discussion links ".../...-mla..."). Passing the
-    // full catalog slug therefore matches 0 links -> empty file. So we strip the
-    // trailing AWS version code ("-c01", "-c02", ...) for the search term, and
-    // fall back to the full slug if the trimmed one yields nothing.
+    // Some exams have discussion links that match the full catalog slug
+    // (e.g. ".../aif-c01/" links contain "...-aif-c01"), others omit the version
+    // code (e.g. ".../mla-c01/" links contain "...-mla"). We can't know which
+    // upfront, so we try the FULL slug first (most specific, usually most complete)
+    // and fall back to the version-stripped slug only if the full one yields nothing.
     const trimmed = search.replace(/-c\d+$/i, '');
-    const searchVariants = trimmed !== search ? [trimmed, search] : [search];
+    const searchVariants = trimmed !== search ? [search, trimmed] : [search];
 
     function attempt(idx) {
         const searchTerm = searchVariants[idx];
