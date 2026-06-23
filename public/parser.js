@@ -77,29 +77,59 @@ function parseQuestionBlock(block) {
 
     // ─── Correct answer ───────────────────────────────────────────────
     let correctAnswer = '';
+    let answerConfidence = 0; // 0=unknown, 1=low(community few votes), 2=high(official or many votes)
+
     const answerMatch =
         block.match(/\*\*Answer:\s*([A-F]+)\*\*/i) ||
-        block.match(/Answer:\s*([A-F]+)\b/i) ||
         block.match(/Suggested Answer:\s*([A-F]+)/i);
-    if (answerMatch) correctAnswer = answerMatch[1].toUpperCase();
+    if (answerMatch) {
+        correctAnswer = answerMatch[1].toUpperCase();
+        answerConfidence = 2; // official
+    }
 
-    // Fallback: community consensus from discussions
+    // Fallback: community consensus - count votes per answer
     if (!correctAnswer) {
-        const selected = [];
-        for (const m of block.matchAll(/Selected Answer:\s*([A-F]+)/gi)) {
-            selected.push(m[1].toUpperCase());
+        // Extract all "Selected Answer: X ... upvoted N times" pairs (legacy format)
+        const voteCounts = {};
+        const legacyVotes = [...block.matchAll(/Selected Answer:\s*([A-F]+)[^]*?upvoted\s+(\d+)\s+times/gi)];
+        for (const m of legacyVotes) {
+            const ans = m[1].toUpperCase();
+            voteCounts[ans] = (voteCounts[ans] || 0) + parseInt(m[2]);
         }
-        if (selected.length > 0) {
-            // Most frequent selected answer
-            const counts = {};
-            selected.forEach(a => counts[a] = (counts[a] || 0) + 1);
-            correctAnswer = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+
+        // New format: just count occurrences (no vote count)
+        if (Object.keys(voteCounts).length === 0) {
+            const simpleSelections = [...block.matchAll(/Selected Answer:\s*([A-F]+)/gi)];
+            for (const m of simpleSelections) {
+                const ans = m[1].toUpperCase();
+                voteCounts[ans] = (voteCounts[ans] || 0) + 1;
+            }
         }
+
+        if (Object.keys(voteCounts).length > 0) {
+            const sorted = Object.entries(voteCounts).sort((a, b) => b[1] - a[1]);
+            correctAnswer = sorted[0][0];
+            const totalVotes = Object.values(voteCounts).reduce((s, v) => s + v, 0);
+            answerConfidence = totalVotes >= 5 ? 2 : 1; // high if 5+ votes
+        }
+
         if (!correctAnswer) {
             const m = block.match(/(?:correct answer|the answer)\s*(?:is|should be|:)\s*([A-F]+)\b/i);
-            if (m) correctAnswer = m[1].toUpperCase();
+            if (m) { correctAnswer = m[1].toUpperCase(); answerConfidence = 1; }
         }
     }
+
+    // ─── Multi-answer detection ───────────────────────────────────────
+    // 1) From the question text: "(Choose two.)" "(Choose three.)" etc.
+    const chooseMatch = questionText.match(/\(Choose\s+(\w+)\.?\)/i);
+    let expectedCount = 1;
+    if (chooseMatch) {
+        const words = { two: 2, three: 3, four: 4, five: 5, '2': 2, '3': 3, '4': 4 };
+        expectedCount = words[chooseMatch[1].toLowerCase()] || parseInt(chooseMatch[1]) || 1;
+    } else if (correctAnswer.length > 1) {
+        expectedCount = correctAnswer.length;
+    }
+    const multiAnswer = expectedCount > 1;
 
     // ─── ExamTopics link ──────────────────────────────────────────────
     let link = '';
@@ -167,8 +197,9 @@ function parseQuestionBlock(block) {
         text: questionText || title,
         choices,
         correctAnswer,
-        multiAnswer: correctAnswer.length > 1,
-        expectedCount: correctAnswer.length || 1,
+        answerConfidence,
+        multiAnswer,
+        expectedCount,
         link,
         timestamp,
         explanation,

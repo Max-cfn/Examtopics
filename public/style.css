@@ -863,6 +863,17 @@ a:hover {
     display: inline-block;
 }
 
+.answer-confidence-hint {
+    background: rgba(148, 163, 184, 0.1);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    margin-bottom: 0.75rem;
+    display: inline-block;
+}
+
 .choices {
     display: flex;
     flex-direction: column;

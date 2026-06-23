@@ -917,6 +917,12 @@
         if (isMulti) {
             html += `<div class="multi-answer-hint">⚠️ Sélectionnez ${question.expectedCount} réponses</div>`;
         }
+        // Show confidence indicator if answer comes from community with low votes
+        if (!showCorrect && question.answerConfidence === 1) {
+            html += `<div class="answer-confidence-hint">💬 Réponse basée sur peu de votes — consultez ExamTopics pour confirmation</div>`;
+        } else if (!showCorrect && question.answerConfidence === 0) {
+            html += `<div class="answer-confidence-hint">❓ Aucune réponse disponible</div>`;
+        }
         html += `<div class="question-text">${escapeHTML(question.text)}</div>`;
         html += `<div class="choices">`;
         
