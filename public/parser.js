@@ -87,30 +87,39 @@ function parseQuestionBlock(block) {
         answerConfidence = 2; // official
     }
 
-    // Fallback: community consensus - count votes per answer
+    // Fallback: community consensus - the answer whose single most-upvoted comment wins
     if (!correctAnswer) {
-        // Extract all "Selected Answer: X ... upvoted N times" pairs (legacy format)
-        const voteCounts = {};
+        // Track the MAX upvotes of any single comment per answer (ExamTopics convention:
+        // the "Highly Voted" comment indicates the answer, not the sum across comments)
+        const maxVotes = {};   // answer -> highest single-comment upvotes
+        const commentCount = {}; // answer -> number of comments (tiebreaker)
         const legacyVotes = [...block.matchAll(/Selected Answer:\s*([A-F]+)[^]*?upvoted\s+(\d+)\s+times/gi)];
         for (const m of legacyVotes) {
             const ans = m[1].toUpperCase();
-            voteCounts[ans] = (voteCounts[ans] || 0) + parseInt(m[2]);
+            const v = parseInt(m[2]);
+            maxVotes[ans] = Math.max(maxVotes[ans] || 0, v);
+            commentCount[ans] = (commentCount[ans] || 0) + 1;
         }
 
-        // New format: just count occurrences (no vote count)
-        if (Object.keys(voteCounts).length === 0) {
+        // New format without vote counts: just count occurrences
+        if (Object.keys(maxVotes).length === 0) {
             const simpleSelections = [...block.matchAll(/Selected Answer:\s*([A-F]+)/gi)];
             for (const m of simpleSelections) {
                 const ans = m[1].toUpperCase();
-                voteCounts[ans] = (voteCounts[ans] || 0) + 1;
+                commentCount[ans] = (commentCount[ans] || 0) + 1;
+                maxVotes[ans] = 0;
             }
         }
 
-        if (Object.keys(voteCounts).length > 0) {
-            const sorted = Object.entries(voteCounts).sort((a, b) => b[1] - a[1]);
-            correctAnswer = sorted[0][0];
-            const totalVotes = Object.values(voteCounts).reduce((s, v) => s + v, 0);
-            answerConfidence = totalVotes >= 5 ? 2 : 1; // high if 5+ votes
+        if (Object.keys(maxVotes).length > 0) {
+            // Sort by: highest single-comment upvotes, then by comment count
+            const sorted = Object.keys(maxVotes).sort((a, b) => {
+                if (maxVotes[b] !== maxVotes[a]) return maxVotes[b] - maxVotes[a];
+                return (commentCount[b] || 0) - (commentCount[a] || 0);
+            });
+            correctAnswer = sorted[0];
+            const topVotes = maxVotes[correctAnswer];
+            answerConfidence = topVotes >= 5 ? 2 : 1;
         }
 
         if (!correctAnswer) {

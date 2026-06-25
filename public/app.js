@@ -981,6 +981,10 @@
     let currentQuizType = ''; // 'batch-3', 'custom', 'all', etc.
 
     function saveToHistory(correct, incorrect, unanswered, total, score) {
+        // Skip trivial sessions (0 or 1 question answered - usually just testing)
+        const answeredCount = total - unanswered;
+        if (answeredCount < 2) return;
+
         const history = JSON.parse(localStorage.getItem('quizHistory') || '[]');
         const rangeType = document.querySelector('input[name="questionRange"]:checked')?.value || 'all';
         
@@ -989,16 +993,18 @@
         else if (rangeType === 'first') rangeDesc = `${document.getElementById('rangeN')?.value || '?'} premières`;
         else if (rangeType === 'range') rangeDesc = `Q${document.getElementById('rangeFrom')?.value || '?'}–${document.getElementById('rangeTo')?.value || '?'}`;
 
-        // Store detailed results for review
+        // Store detailed results for review (with quiz position index)
         const details = currentQuestions.map((q, i) => {
             const answer = userAnswers[i];
             const userLetters = Array.isArray(answer) ? answer : (answer ? [answer] : []);
             const correctLetters = q.correctAnswer ? q.correctAnswer.split('') : [];
             return {
+                position: i + 1,
                 number: q.number,
                 text: q.text.substring(0, 200),
                 choices: q.choices,
                 correctAnswer: q.correctAnswer,
+                answerConfidence: q.answerConfidence,
                 userAnswer: userLetters,
                 isCorrect: userLetters.length === correctLetters.length && userLetters.every(l => correctLetters.includes(l)),
                 link: q.link,
@@ -1127,14 +1133,23 @@
 
             const userDisplay = d.userAnswer.length > 0 ? d.userAnswer.join(', ') : '—';
             const correctLetters = d.correctAnswer ? d.correctAnswer.split('') : [];
+            const posLabel = d.position ? `Q${d.position} du quiz — ` : '';
 
             html += `<div class="result-question ${d.isCorrect ? 'is-correct' : 'is-incorrect'}">
                 <div class="result-question-header">
-                    <span>Question #${d.number}</span>
+                    <span>${posLabel}Question #${d.number}</span>
                     <span class="badge ${d.isCorrect ? 'correct' : 'incorrect'}">${d.isCorrect ? '✓' : '✗'}</span>
                 </div>
-                <div class="result-question-text-full">${escapeHTML(d.text)}</div>
-                <div class="result-choices">`;
+                <div class="result-question-text-full">${escapeHTML(d.text)}</div>`;
+
+            // Low-confidence warning
+            if (d.answerConfidence === 1) {
+                html += `<div class="answer-confidence-hint">💬 Réponse basée sur peu de votes — vérifiez sur ExamTopics</div>`;
+            } else if (d.answerConfidence === 0) {
+                html += `<div class="answer-confidence-hint">❓ Aucune réponse fiable disponible</div>`;
+            }
+
+            html += `<div class="result-choices">`;
 
             for (const choice of d.choices) {
                 let cls = 'result-choice';
@@ -1224,11 +1239,19 @@
             // Full question text
             html += `<div class="result-question ${isCorrect ? 'is-correct' : 'is-incorrect'}">
                 <div class="result-question-header">
-                    <span>Topic ${q.topic} — Question #${q.number}</span>
+                    <span>Q${i + 1} du quiz — Question #${q.number}</span>
                     <span class="badge ${isCorrect ? 'correct' : 'incorrect'}">${isCorrect ? '✓ Correct' : '✗ Incorrect'}</span>
                 </div>
-                <div class="result-question-text-full">${escapeHTML(q.text)}</div>
-                <div class="result-choices">`;
+                <div class="result-question-text-full">${escapeHTML(q.text)}</div>`;
+
+            // Low-confidence warning
+            if (q.answerConfidence === 1) {
+                html += `<div class="answer-confidence-hint">💬 Réponse basée sur peu de votes — vérifiez sur ExamTopics</div>`;
+            } else if (q.answerConfidence === 0) {
+                html += `<div class="answer-confidence-hint">❓ Aucune réponse fiable disponible</div>`;
+            }
+
+            html += `<div class="result-choices">`;
             
             // Show all choices with correct/incorrect highlighting
             for (const choice of q.choices) {
