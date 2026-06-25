@@ -795,6 +795,47 @@ a:hover {
     font-variant-numeric: tabular-nums;
     color: var(--text);
 }
+.exam-timer-group {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+.exam-timer-group .btn-sm {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.9rem;
+}
+
+.pause-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+.pause-overlay.hidden {
+    display: none;
+}
+.pause-card {
+    text-align: center;
+    padding: 2.5rem 3rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.pause-card .pause-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 1rem;
+}
+.pause-card h2 {
+    margin-bottom: 0.5rem;
+}
+.pause-card p {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
 .exam-timer.warning {
     color: var(--warning);
 }

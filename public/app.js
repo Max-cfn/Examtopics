@@ -499,7 +499,11 @@
         currentQuizType = `Quiz ${batchIdx + 1} (Q${sorted[start].number}–${sorted[end-1].number})`;
 
         if (mode === 'exam') {
-            const minutes = parseInt(document.getElementById('examTime').value) || 30;
+            // Base: 1h30 (90 min) pour 50 questions → 1.8 min/question
+            const suggested = Math.max(1, Math.round(batchQuestions.length * 1.8));
+            const input = prompt(`Durée de l'examen en minutes ?\n(${batchQuestions.length} questions — suggéré : ${suggested} min)`, suggested);
+            if (input === null) return; // annulé
+            const minutes = parseInt(input) || suggested;
             timeRemaining = minutes * 60;
             showScreen('exam');
             renderExamQuestion();
@@ -653,9 +657,14 @@
     }
 
     // ─── Timer ───────────────────────────────────────────────────────────
+    let isPaused = false;
+
     function startTimer() {
+        isPaused = false;
         updateTimerDisplay();
+        if (timerInterval) clearInterval(timerInterval);
         timerInterval = setInterval(() => {
+            if (isPaused) return;
             timeRemaining--;
             updateTimerDisplay();
             if (timeRemaining <= 0) {
@@ -663,6 +672,16 @@
                 finishExam();
             }
         }, 1000);
+    }
+
+    function pauseExam() {
+        isPaused = true;
+        document.getElementById('examPauseOverlay').classList.remove('hidden');
+    }
+
+    function resumeExam() {
+        isPaused = false;
+        document.getElementById('examPauseOverlay').classList.add('hidden');
     }
 
     function updateTimerDisplay() {
@@ -744,7 +763,12 @@
         finishExam();
     });
 
+    document.getElementById('examPause').addEventListener('click', pauseExam);
+    document.getElementById('examResume').addEventListener('click', resumeExam);
+
     function finishExam() {
+        isPaused = false;
+        document.getElementById('examPauseOverlay').classList.add('hidden');
         clearInterval(timerInterval);
         clearSession();
         showResults();

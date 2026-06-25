@@ -160,7 +160,7 @@
                             <input type="number" id="examCount" min="1" value="20">
                         </label>
                         <label>Durée (minutes) :
-                            <input type="number" id="examTime" min="1" value="30">
+                            <input type="number" id="examTime" min="1" value="90">
                         </label>
                         <label class="checkbox-label">
                             <input type="checkbox" id="examShuffle" checked>
@@ -195,7 +195,19 @@
                     <span id="examProgress">1/20</span>
                     <div class="progress-bar"><div id="examProgressBar" class="progress-fill"></div></div>
                 </div>
-                <div class="exam-timer" id="examTimer">30:00</div>
+                <div class="exam-timer-group">
+                    <div class="exam-timer" id="examTimer">90:00</div>
+                    <button class="btn btn-sm btn-secondary" id="examPause" title="Mettre en pause">⏸</button>
+                </div>
+            </div>
+
+            <div id="examPauseOverlay" class="pause-overlay hidden">
+                <div class="pause-card">
+                    <span class="pause-icon">⏸</span>
+                    <h2>Examen en pause</h2>
+                    <p>Le timer est arrêté. Cliquez pour reprendre.</p>
+                    <button class="btn btn-primary" id="examResume">▶ Reprendre</button>
+                </div>
             </div>
 
             <div class="question-container" id="examQuestion"></div>
