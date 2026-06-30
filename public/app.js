@@ -9,6 +9,7 @@
     let currentQuestions = [];
     let currentIndex = 0;
     let userAnswers = {};
+    let flaggedQuestions = {}; // index -> true
     let mode = '';
     let timerInterval = null;
     let timeRemaining = 0;
@@ -494,6 +495,7 @@
         currentQuestions = batchQuestions;
         currentIndex = 0;
         userAnswers = {};
+        flaggedQuestions = {};
         trainCorrect = 0;
         trainTotal = 0;
         currentQuizType = `Quiz ${batchIdx + 1} (Q${sorted[start].number}–${sorted[end-1].number})`;
@@ -615,6 +617,7 @@
         currentQuestions = selectQuestions(count, shuffle);
         currentIndex = 0;
         userAnswers = {};
+        flaggedQuestions = {};
         timeRemaining = minutes * 60;
 
         showScreen('exam');
@@ -637,6 +640,7 @@
         currentQuestions = selectQuestions(count, shuffle);
         currentIndex = 0;
         userAnswers = {};
+        flaggedQuestions = {};
         trainCorrect = 0;
         trainTotal = 0;
 
@@ -744,6 +748,7 @@
             renderExamQuestion();
         });
 
+        bindFlagButton(container);
         document.getElementById('examPrev').disabled = currentIndex === 0;
     }
 
@@ -821,6 +826,7 @@
                 el.classList.toggle('selected', selectedLetters.includes(el.dataset.letter));
             });
         });
+        bindFlagButton(container);
     }
 
     document.getElementById('trainCheck').addEventListener('click', () => {
@@ -933,11 +939,16 @@
         const correctLetters = question.correctAnswer ? question.correctAnswer.split('') : [];
         
         let html = `<div class="question-meta">
-            <span class="question-id">Topic ${question.topic} — Question #${question.number}</span>`;
+            <span class="question-id">Topic ${question.topic} — Question #${question.number}</span>
+            <span class="question-meta-right">`;
+        if (!showCorrect) {
+            const isFlagged = flaggedQuestions[currentIndex];
+            html += `<button class="flag-btn ${isFlagged ? 'flagged' : ''}" id="flagBtn" title="Marquer cette question">${isFlagged ? '🚩 Marquée' : '🏳️ Marquer'}</button>`;
+        }
         if (question.link) {
             html += `<span class="question-link"><a href="${question.link}" target="_blank">🔗 Voir sur ExamTopics</a></span>`;
         }
-        html += `</div>`;
+        html += `</span></div>`;
         if (isMulti) {
             html += `<div class="multi-answer-hint">⚠️ Sélectionnez ${question.expectedCount} réponses</div>`;
         }
@@ -968,6 +979,23 @@
     function bindChoiceClicks(container, callback) {
         container.querySelectorAll('.choice').forEach(el => {
             el.addEventListener('click', () => callback(el.dataset.letter));
+        });
+    }
+
+    function bindFlagButton(container) {
+        const btn = container.querySelector('#flagBtn');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            if (flaggedQuestions[currentIndex]) {
+                delete flaggedQuestions[currentIndex];
+                btn.classList.remove('flagged');
+                btn.textContent = '🏳️ Marquer';
+            } else {
+                flaggedQuestions[currentIndex] = true;
+                btn.classList.add('flagged');
+                btn.textContent = '🚩 Marquée';
+            }
+            saveSession();
         });
     }
 
@@ -1006,6 +1034,7 @@
                 correctAnswer: q.correctAnswer,
                 answerConfidence: q.answerConfidence,
                 userAnswer: userLetters,
+                flagged: !!flaggedQuestions[i],
                 isCorrect: userLetters.length === correctLetters.length && userLetters.every(l => correctLetters.includes(l)),
                 link: q.link,
                 explanation: q.explanation ? q.explanation.substring(0, 300) : ''
@@ -1108,6 +1137,7 @@
                 <button class="filter-tab active" data-hfilter="all">Toutes (${entry.total})</button>
                 <button class="filter-tab" data-hfilter="correct">Correctes (${entry.correct})</button>
                 <button class="filter-tab" data-hfilter="incorrect">Incorrectes (${entry.incorrect + entry.unanswered})</button>
+                <button class="filter-tab" data-hfilter="flagged">🚩 Marquées (${(entry.details || []).filter(d => d.flagged).length})</button>
             </div>
             <div id="historyResultsList"></div>`;
         document.getElementById('resultsDetails').innerHTML = html;
@@ -1130,6 +1160,7 @@
         for (const d of details) {
             if (filter === 'correct' && !d.isCorrect) continue;
             if (filter === 'incorrect' && d.isCorrect) continue;
+            if (filter === 'flagged' && !d.flagged) continue;
 
             const userDisplay = d.userAnswer.length > 0 ? d.userAnswer.join(', ') : '—';
             const correctLetters = d.correctAnswer ? d.correctAnswer.split('') : [];
@@ -1137,7 +1168,7 @@
 
             html += `<div class="result-question ${d.isCorrect ? 'is-correct' : 'is-incorrect'}">
                 <div class="result-question-header">
-                    <span>${posLabel}Question #${d.number}</span>
+                    <span>${posLabel}Question #${d.number}${d.flagged ? ' 🚩' : ''}</span>
                     <span class="badge ${d.isCorrect ? 'correct' : 'incorrect'}">${d.isCorrect ? '✓' : '✗'}</span>
                 </div>
                 <div class="result-question-text-full">${escapeHTML(d.text)}</div>`;
@@ -1201,12 +1232,14 @@
             <div class="result-card"><div class="value">${unanswered}</div><div class="label">Sans réponse</div></div>
         `;
 
+        const flaggedCount = Object.keys(flaggedQuestions).length;
         document.getElementById('resultsDetails').innerHTML = `
             <h2>Détail des questions</h2>
             <div class="filter-tabs">
                 <button class="filter-tab active" data-filter="all">Toutes (${total})</button>
                 <button class="filter-tab" data-filter="correct">Correctes (${correct})</button>
                 <button class="filter-tab" data-filter="incorrect">Incorrectes (${incorrect + unanswered})</button>
+                <button class="filter-tab" data-filter="flagged">🚩 Marquées (${flaggedCount})</button>
             </div>
             <div id="resultsList"></div>
         `;
@@ -1233,13 +1266,15 @@
             const userLetters = Array.isArray(answer) ? answer : (answer ? [answer] : []);
             const correctLetters = q.correctAnswer ? q.correctAnswer.split('') : [];
             const isCorrect = userLetters.length === correctLetters.length && userLetters.every(l => correctLetters.includes(l));
+            const isFlagged = !!flaggedQuestions[i];
             if (filter === 'correct' && !isCorrect) return;
             if (filter === 'incorrect' && isCorrect) return;
+            if (filter === 'flagged' && !isFlagged) return;
 
             // Full question text
             html += `<div class="result-question ${isCorrect ? 'is-correct' : 'is-incorrect'}">
                 <div class="result-question-header">
-                    <span>Q${i + 1} du quiz — Question #${q.number}</span>
+                    <span>Q${i + 1} du quiz — Question #${q.number}${isFlagged ? ' 🚩' : ''}</span>
                     <span class="badge ${isCorrect ? 'correct' : 'incorrect'}">${isCorrect ? '✓ Correct' : '✗ Incorrect'}</span>
                 </div>
                 <div class="result-question-text-full">${escapeHTML(q.text)}</div>`;
@@ -1294,6 +1329,7 @@
 
     document.getElementById('retryExam').addEventListener('click', () => {
         userAnswers = {};
+        flaggedQuestions = {};
         currentIndex = 0;
         trainCorrect = 0;
         trainTotal = 0;
@@ -1341,6 +1377,7 @@
             currentQuestions,
             currentIndex,
             userAnswers,
+            flaggedQuestions,
             timeRemaining,
             trainCorrect,
             trainTotal,
@@ -1375,6 +1412,7 @@
             currentQuestions = state.currentQuestions;
             currentIndex = state.currentIndex;
             userAnswers = state.userAnswers;
+            flaggedQuestions = state.flaggedQuestions || {};
             timeRemaining = state.timeRemaining;
             trainCorrect = state.trainCorrect;
             trainTotal = state.trainTotal;
